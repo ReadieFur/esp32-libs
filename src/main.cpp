@@ -2,6 +2,7 @@
 #include "Service/ServiceManager.hpp"
 #include "Event/Event.hpp"
 #include "Event/AutoResetEvent.hpp"
+#include "Event/CancellationToken.hpp"
 
 #ifdef ARDUINO
 void setup() {}

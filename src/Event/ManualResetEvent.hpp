@@ -2,12 +2,12 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
-#include "WaitHandle.hpp"
+#include "AWaitHandle.hpp"
 
 namespace ReadieFur::Event
 {
     //https://freertos.org/Documentation/02-Kernel/04-API-references/12-Event-groups-or-flags/05-xEventGroupSetBits
-    class ManualResetEvent : public WaitHandle
+    class ManualResetEvent : public AWaitHandle
     {
     public:
         bool WaitOne(TickType_t timeout = portMAX_DELAY) override

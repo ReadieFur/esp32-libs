@@ -6,13 +6,13 @@
 namespace ReadieFur::Event
 {
     //https://freertos.org/Documentation/02-Kernel/04-API-references/12-Event-groups-or-flags/05-xEventGroupSetBits
-    class WaitHandle
+    class AWaitHandle
     {
     protected:
         EventGroupHandle_t _eventGroup = xEventGroupCreate();
 
     public:
-        ~WaitHandle()
+        ~AWaitHandle()
         {
             vEventGroupDelete(_eventGroup);
         }
