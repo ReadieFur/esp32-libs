@@ -13,7 +13,6 @@
 
 namespace ReadieFur::Services
 {
-    // template <typename TInstallParams>
     class AService
     {
     private:
