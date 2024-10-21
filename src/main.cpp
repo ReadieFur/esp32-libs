@@ -1,3 +1,8 @@
+#include "freertos/FreeRTOS.h" //Has to be included first.
+#include "Service/ServiceManager.hpp"
+#include "Event/Event.hpp"
+#include "Event/AutoResetEvent.hpp"
+
 #ifdef ARDUINO
 void setup() {}
 void loop() {}

@@ -4,8 +4,9 @@
 #include <map>
 #include <mutex>
 #include <list>
+#include <freertos/task.h>
 
-namespace ReadieFur
+namespace ReadieFur::Event
 {
     /*TODO: Change this to notify FreeRTOS tasks to run their own callbacks instead so that the task calling the dispatch
     method doesn't have to worry about having a large enough stack size for all of the callbacks.*/
@@ -14,7 +15,7 @@ namespace ReadieFur
     {
     private:
         std::mutex _mutex;
-        std::map<ulong, std::function<void(T)>> _callbacks;
+        std::map<TickType_t, std::function<void(T)>> _callbacks;
 
     public:
         void Dispatch(T value)
@@ -27,12 +28,12 @@ namespace ReadieFur
             _mutex.unlock();
         }
 
-        ulong Add(std::function<void(T)> callback)
+        TickType_t Add(std::function<void(T)> callback)
         {
             _mutex.lock();
 
-            ulong id;
-            do { id = millis(); }
+            TickType_t id;
+            do { id = xTaskGetTickCount(); }
             while (_callbacks.find(id) != _callbacks.end());
 
             _callbacks[id] = callback;
@@ -42,7 +43,7 @@ namespace ReadieFur
             return id;
         }
 
-        void Remove(ulong id)
+        void Remove(TickType_t id)
         {
             _mutex.lock();
             _callbacks.erase(id);
@@ -52,7 +53,7 @@ namespace ReadieFur
         /// @return Returns the number of callbacks removed.
         size_t Remove(std::function<void(T)> callback)
         {
-            std::list<ulong> callbacksToRemove;
+            std::list<TickType_t> callbacksToRemove;
 
             for (auto &&kvp : _callbacks)
                 if (kvp.second == callback)
