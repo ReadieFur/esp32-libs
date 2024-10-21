@@ -26,7 +26,8 @@ namespace ReadieFur::Service
         std::function<AService*(std::type_index)> _getServiceCallback = nullptr;
         std::unordered_set<std::type_index> _dependencies = {};
         Event::AutoResetEvent _taskEndedEvent;
-        TaskHandle_t* _taskHandle = nullptr;
+        TaskHandle_t* _taskHandle = nullptr; //I want to use this to test if the service is running however it doesn't seem to be working.
+        bool running = false;
         Event::CancellationTokenSource* _taskCts = nullptr;
 
         static void TaskWrapper(void* param)
@@ -126,6 +127,8 @@ namespace ReadieFur::Service
                 delete _taskCts;
                 return EServiceResult::Failed;
             }
+
+            running = true;
             return EServiceResult::Ok;
         }
 
@@ -156,6 +159,7 @@ namespace ReadieFur::Service
             delete _taskCts;
             _taskCts = nullptr;
             _taskHandle = nullptr;
+            running = false;
 
             _serviceMutex.unlock();
             return EServiceResult::Ok;
@@ -201,9 +205,10 @@ namespace ReadieFur::Service
     public:
         bool IsRunning()
         {
-            _serviceMutex.lock();
-            bool retVal = _taskHandle != nullptr;
-            _serviceMutex.unlock();
+            // _serviceMutex.lock();
+            // bool retVal = (_taskHandle != nullptr);
+            bool retVal = running;
+            // _serviceMutex.unlock();
             return retVal;
         }
     };

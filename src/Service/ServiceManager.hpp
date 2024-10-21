@@ -58,7 +58,7 @@ namespace ReadieFur::Service
             std::vector<std::vector<AService*>*> dependenciesToAddTo;
             for (auto &&dependency : service->_dependencies)
             {
-                if (_references.find(dependency) == _references.end())
+                if (_services.find(dependency) == _services.end())
                 {
                     _mutex.unlock();
                     delete service;
@@ -103,9 +103,11 @@ namespace ReadieFur::Service
                 _mutex.unlock();
                 return EServiceResult::InUse;
             }
+            _references.erase(std::type_index(typeid(T)));
 
             delete service->second;
             _services.erase(std::type_index(typeid(T)));
+
 
             _mutex.unlock();
             return EServiceResult::Ok;
