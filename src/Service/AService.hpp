@@ -107,13 +107,17 @@ namespace ReadieFur::Service
             _taskCts = new Event::CancellationTokenSource();
             ServiceCancellationToken = _taskCts->GetToken();
 
+            char buf[configMAX_TASK_NAME_LEN];
+            sprintf(buf, "srv%u", xTaskGetTickCount());
+            //typeid(*this).name()
+
             #if configNUM_CORES > 1
             BaseType_t taskCreateResult;
             if (ServiceEntrypointCore != -1 && ServiceEntrypointCore >= 0 && ServiceEntrypointCore < configNUM_CORES)
-                taskCreateResult = xTaskCreatePinnedToCore(TaskWrapper, typeid(*this).name(), ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, _taskHandle, ServiceEntrypointCore);
+                taskCreateResult = xTaskCreatePinnedToCore(TaskWrapper, buf, ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, _taskHandle, ServiceEntrypointCore);
             else
             #endif
-                taskCreateResult = xTaskCreate(TaskWrapper, typeid(*this).name(), ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, _taskHandle);
+                taskCreateResult = xTaskCreate(TaskWrapper, buf, ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, _taskHandle);
 
             _serviceMutex.unlock();
 
