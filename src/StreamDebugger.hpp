@@ -11,7 +11,8 @@ public:
 
 	virtual size_t write(uint8_t ch)
 	{
-		DumpStream->write(ch);
+		if (DumpStream != nullptr)
+			DumpStream->write(ch);
 		return _dataStream.write(ch);
 	}
 
