@@ -23,7 +23,7 @@ namespace ReadieFur::Service
 
         static AService* GetServiceInternal(std::type_index type)
         {
-            _mutex.lock();
+            // _mutex.lock();
 
             auto service = _services.find(type);
             if (service == _services.end())
@@ -32,7 +32,7 @@ namespace ReadieFur::Service
                 return nullptr;
             }
 
-            _mutex.unlock();
+            // _mutex.unlock();
             return service->second;
         }
 
@@ -150,7 +150,10 @@ namespace ReadieFur::Service
         typename std::enable_if<std::is_base_of<AService, T>::value, T*>::type
         static GetService()
         {
-            return reinterpret_cast<T*>(GetServiceInternal(std::type_index(typeid(T))));
+            _mutex.lock();
+            T* retVal = reinterpret_cast<T*>(GetServiceInternal(std::type_index(typeid(T))));
+            _mutex.unlock();
+            return retVal;
         }
     };
 };
