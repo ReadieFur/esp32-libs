@@ -11,6 +11,7 @@
 #include "Helpers.h"
 #include <freertos/FreeRTOSConfig.h>
 #include <WString.h>
+#include <Service/ServiceManager.hpp>
 
 namespace ReadieFur::Diagnostic
 {
@@ -64,6 +65,7 @@ namespace ReadieFur::Diagnostic
             //Free allocated memory for taskStatusArray.
             free(tasksArray);
             #else
+            // auto a = ReadieFur::Service::ServiceManager::_services;
             return false;
             #endif
         }

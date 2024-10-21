@@ -16,6 +16,7 @@ namespace ReadieFur::Service
 {
     class ServiceManager
     {
+    // friend class ReadieFur::Diagnostic::DiagnosticsService;
     private:
         static std::mutex _mutex;
         static std::map<std::type_index, AService*> _services;
