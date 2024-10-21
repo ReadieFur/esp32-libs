@@ -19,7 +19,9 @@ namespace ReadieFur::Event
             CancellationTokenSource* _cts;
 
             SCancellationToken(CancellationTokenSource* cts) : _cts(cts) {}
+
         public:
+            SCancellationToken() : _cts(nullptr) {}
 
             bool IsCancellationRequested()
             {

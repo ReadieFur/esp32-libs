@@ -50,7 +50,7 @@ namespace ReadieFur::Service
             }
 
             //It isn't possible for a circular dependency to exist here because this service doesn't exist in the list yet.
-            AService* service = new T();
+            AService* service = reinterpret_cast<AService*>(new T());
             service->_getServiceCallback = GetServiceInternal;
             
             //Check if all dependencies are satisfied.
@@ -154,3 +154,7 @@ namespace ReadieFur::Service
         }
     };
 };
+
+std::mutex ReadieFur::Service::ServiceManager::_mutex;
+std::map<std::type_index, ReadieFur::Service::AService*> ReadieFur::Service::ServiceManager::_services;
+std::map<std::type_index, std::vector<ReadieFur::Service::AService*>> ReadieFur::Service::ServiceManager::_references;

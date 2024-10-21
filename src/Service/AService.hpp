@@ -63,11 +63,6 @@ namespace ReadieFur::Service
             // self->_serviceMutex.unlock();
         }
 
-        void CleanupTask()
-        {
-            
-        }
-
         // bool ContainsCircularDependency(AService* service)
         // {
         //     //This was originally a recursive method however I am using an iterative method to save space on the stack.
@@ -163,7 +158,7 @@ namespace ReadieFur::Service
         }
 
     protected:
-        virtual EServiceResult RunServiceImpl() = 0;
+        virtual void RunServiceImpl() = 0;
 
         uint ServiceEntrypointPriority = configMAX_PRIORITIES * 0.1;
         uint ServiceEntrypointStackDepth = configIDLE_TASK_STACK_SIZE;
