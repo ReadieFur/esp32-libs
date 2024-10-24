@@ -25,7 +25,7 @@ namespace ReadieFur::Event
 
             bool IsCancellationRequested()
             {
-                return _cts == nullptr || _cts->_cancelled;
+                return _cts == nullptr || _cts->IsSet();
             }
 
             bool WaitForCancellation(TickType_t timeoutTicks)
@@ -47,7 +47,6 @@ namespace ReadieFur::Event
         
     private:
         std::mutex _mutex;
-        bool _cancelled = false;
         bool _configured = false;
         TaskHandle_t _timeoutTask = nullptr;
 
@@ -62,17 +61,11 @@ namespace ReadieFur::Event
             STimeoutCallbackParams* params = reinterpret_cast<STimeoutCallbackParams*>(param);
             vTaskDelay(params->timeoutTicks);
             params->self->_mutex.lock();
-            params->self->CancelInternal();
+            params->self->Set();
             params->self->_mutex.unlock();
             vTaskDelete(NULL);
             params->self->_timeoutTask = nullptr;
             delete params;
-        }
-
-        void CancelInternal()
-        {
-            _cancelled = true;
-            Set();
         }
 
         bool WaitOne(TickType_t) override { return true; }
@@ -119,7 +112,7 @@ namespace ReadieFur::Event
             }
 
             _configured = true;
-            CancelInternal();
+            Set();
 
             _mutex.unlock();
 
@@ -133,7 +126,7 @@ namespace ReadieFur::Event
 
         bool IsCancelled()
         {
-            return _cancelled;
+            return IsSet();
         }
     };
 }
