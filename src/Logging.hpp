@@ -13,7 +13,8 @@
 #endif
 #include <stdio.h>
 
-#define WRITE(format, ...) ReadieFur::Logging::Write(format, ##__VA_ARGS__)
+#define PRINT(format, ...) ReadieFur::Logging::Print(format, ##__VA_ARGS__)
+#define WRITE(c) ReadieFur::Logging::Write(c)
 
 #ifdef ARDUINO
 #define ARDUHAL_LOG_FORMAT2(letter, format) ARDUHAL_LOG_COLOR_ ## letter "[%6u][" #letter "][%s:%u]: " format ARDUHAL_LOG_RESET_COLOR "\r\n", (unsigned long) (esp_timer_get_time() / 1000ULL), pathToFileName(__FILE__), __LINE__
@@ -35,7 +36,7 @@ namespace ReadieFur
     class Logging //: public Service::AService
     {
     private:
-        static int FormatWrite(int (*writer)(char*, size_t), const char* format, va_list args)
+        static int FormatWrite(int (*writer)(const char*, size_t), const char* format, va_list args)
         {
             //Based on esp32-hal-uart.c::log_printfv
             
@@ -92,23 +93,32 @@ namespace ReadieFur
             esp_log_writev(level, tag, format, args); //TODO: Send to a logger that doesn't do any formatting as I do it manually above for the WebSerial call if enabled.
 
             #if defined(WebSerial) || defined(WebSerialLite)
-            FormatWrite([](char* data, size_t len) { return (int)WebSerial.write((const uint8_t*)data, len); }, format, args);
+            FormatWrite([](const char* data, size_t len) { return (int)WebSerial.write(reinterpret_cast<const uint8_t*>(data), len); }, format, args);
             #endif
 
             va_end(args);
         }
 
-        static int Write(const char* format, ...)
+        static int Write(char c)
+        {
+            int lWritten = putchar(c);
+            #if defined(WebSerial) || defined(WebSerialLite)
+            WebSerial.write(c);
+            #endif
+            return lWritten;
+        }
+
+        static int Print(const char* format, ...)
         {
             va_list args;
             va_start(args, format);
 
-            int written = FormatWrite([](char* data, size_t len)
+            int written = FormatWrite([](const char* data, size_t len)
             {
                 // int lWritten = uart_write_bytes(0, data, len); //STDOUT is typically UART0 (only works if initalized).
-                int lWritten = printf(data); //Find an output that does not need an f buffer.
+                int lWritten = puts(data);
                 #if defined(WebSerial) || defined(WebSerialLite)
-                WebSerial.write((const uint8_t*)data, len);
+                WebSerial.write(reinterpret_cast<const uint8_t*>(data), len);
                 #endif
                 return lWritten;
             }, format, args);
