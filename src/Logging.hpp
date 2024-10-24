@@ -8,21 +8,26 @@
 #elif defined(WebSerialLite)
 #include <WebSerialLite.h>
 #endif
+#ifdef ARDUINO
+#include <esp32-hal-log.h>
+#endif
+#include <stdio.h>
 
 #define WRITE(format, ...) ReadieFur::Logging::Write(format, ##__VA_ARGS__)
 
-#if CONFIG_LOG_TIMESTAMP_SOURCE_RTOS
+#ifdef ARDUINO
+#define ARDUHAL_LOG_FORMAT2(letter, format) ARDUHAL_LOG_COLOR_ ## letter "[%6u][" #letter "][%s:%u]: " format ARDUHAL_LOG_RESET_COLOR "\r\n", (unsigned long) (esp_timer_get_time() / 1000ULL), pathToFileName(__FILE__), __LINE__
+#define LOGE(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_ERROR, tag, ARDUHAL_LOG_FORMAT2(E, format), ##__VA_ARGS__)
+#define LOGW(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_WARN, tag, ARDUHAL_LOG_FORMAT2(W, format), ##__VA_ARGS__)
+#define LOGI(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_INFO, tag, ARDUHAL_LOG_FORMAT2(I, format), ##__VA_ARGS__)
+#define LOGD(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_DEBUG, tag, ARDUHAL_LOG_FORMAT2(D, format), ##__VA_ARGS__)
+#define LOGV(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_VERBOSE, tag, ARDUHAL_LOG_FORMAT2(V, format), ##__VA_ARGS__)
+#else
 #define LOGE(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_ERROR, tag, LOG_FORMAT(E, format), esp_log_timestamp(), tag, ##__VA_ARGS__)
 #define LOGW(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_WARN, tag, LOG_FORMAT(W, format), esp_log_timestamp(), tag, ##__VA_ARGS__)
 #define LOGI(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_INFO, tag, LOG_FORMAT(I, format), esp_log_timestamp(), tag, ##__VA_ARGS__)
 #define LOGD(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_DEBUG, tag, LOG_FORMAT(D, format), esp_log_timestamp(), tag, ##__VA_ARGS__)
 #define LOGV(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_VERBOSE, tag, LOG_FORMAT(V, format), esp_log_timestamp(), tag, ##__VA_ARGS__)
-#else
-#define LOGE(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_ERROR, tag, LOG_SYSTEM_TIME_FORMAT(E, format), esp_log_system_timestamp(), tag, ##__VA_ARGS__)
-#define LOGI(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_INFO, tag, LOG_SYSTEM_TIME_FORMAT(I, format), esp_log_system_timestamp(), tag, ##__VA_ARGS__)
-#define LOGW(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_WARN, tag, LOG_SYSTEM_TIME_FORMAT(W, format), esp_log_system_timestamp(), tag, ##__VA_ARGS__)
-#define LOGD(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_DEBUG, tag, LOG_SYSTEM_TIME_FORMAT(D, format), esp_log_system_timestamp(), tag, ##__VA_ARGS__)
-#define LOGV(tag, format, ...) ReadieFur::Logging::Log(ESP_LOG_VERBOSE, tag, LOG_SYSTEM_TIME_FORMAT(V, format), esp_log_system_timestamp(), tag, ##__VA_ARGS__)
 #endif
 
 namespace ReadieFur
@@ -77,22 +82,14 @@ namespace ReadieFur
     public:
         static void Log(esp_log_level_t level, const char* tag, const char* format, ...)
         {
-            //TODO: Fix this for * log level overrides.
-            // esp_log_level_t localLevel = esp_log_level_get(tag);
-            // if (level == ESP_LOG_NONE || level > localLevel)
-            //     return;
+            esp_log_level_t localLevel = esp_log_level_get(tag);
+            if (level == ESP_LOG_NONE || level > localLevel)
+                return;
 
             va_list args;
             va_start(args, format);
 
             esp_log_writev(level, tag, format, args); //TODO: Send to a logger that doesn't do any formatting as I do it manually above for the WebSerial call if enabled.
-
-            esp_log_level_t localLevel = esp_log_level_get(tag);
-            if (level == ESP_LOG_NONE || level > localLevel)
-            {
-                va_end(args);
-                return;
-            }
 
             #if defined(WebSerial) || defined(WebSerialLite)
             FormatWrite([](char* data, size_t len) { return (int)WebSerial.write((const uint8_t*)data, len); }, format, args);
@@ -101,14 +98,15 @@ namespace ReadieFur
             va_end(args);
         }
 
-        static int Write(const char *format, ...)
+        static int Write(const char* format, ...)
         {
             va_list args;
             va_start(args, format);
 
             int written = FormatWrite([](char* data, size_t len)
             {
-                int lWritten = uart_write_bytes(0, data, len); //STDOUT is typically UART0.
+                // int lWritten = uart_write_bytes(0, data, len); //STDOUT is typically UART0 (only works if initalized).
+                int lWritten = printf(data); //Find an output that does not need an f buffer.
                 #if defined(WebSerial) || defined(WebSerialLite)
                 WebSerial.write((const uint8_t*)data, len);
                 #endif

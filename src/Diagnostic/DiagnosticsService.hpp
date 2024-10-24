@@ -7,7 +7,7 @@
 #include <esp_heap_caps.h>
 #include <freertos/task.h>
 #include <esp_timer.h>
-#include <esp_log.h>
+#include "Logging.hpp"
 #include "Helpers.h"
 #include <freertos/FreeRTOSConfig.h>
 #include <WString.h>
@@ -90,13 +90,13 @@ namespace ReadieFur::Diagnostic
                     if (cpuLogString.endsWith(", "))
                         cpuLogString = cpuLogString.substring(0, cpuLogString.length() - 2);
                     cpuRecordings.clear();
-                    ESP_LOGD(nameof(DiagnosticsService), "%s", cpuLogString.c_str());
+                    LOGD(nameof(DiagnosticsService), "%s", cpuLogString.c_str());
                     cpuLogString.clear();
                 }
 
                 size_t iram, dram;
                 GetFreeMemory(iram, dram);
-                ESP_LOGD(nameof(DiagnosticsService), "Memory free: IRAM: %u, DRAM: %u", iram, dram);
+                LOGD(nameof(DiagnosticsService), "Memory free: IRAM: %u, DRAM: %u", iram, dram);
 
                 std::map<const char*, size_t> taskRecordings;
                 if (GetTasksFreeStack(taskRecordings))
