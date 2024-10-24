@@ -77,14 +77,22 @@ namespace ReadieFur
     public:
         static void Log(esp_log_level_t level, const char* tag, const char* format, ...)
         {
-            esp_log_level_t localLevel = esp_log_level_get(tag);
-            if (level == ESP_LOG_NONE || level > localLevel)
-                return;
+            //TODO: Fix this for * log level overrides.
+            // esp_log_level_t localLevel = esp_log_level_get(tag);
+            // if (level == ESP_LOG_NONE || level > localLevel)
+            //     return;
 
             va_list args;
             va_start(args, format);
 
             esp_log_writev(level, tag, format, args); //TODO: Send to a logger that doesn't do any formatting as I do it manually above for the WebSerial call if enabled.
+
+            esp_log_level_t localLevel = esp_log_level_get(tag);
+            if (level == ESP_LOG_NONE || level > localLevel)
+            {
+                va_end(args);
+                return;
+            }
 
             #if defined(WebSerial) || defined(WebSerialLite)
             FormatWrite([](char* data, size_t len) { return (int)WebSerial.write((const uint8_t*)data, len); }, format, args);
