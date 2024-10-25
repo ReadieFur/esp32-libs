@@ -26,8 +26,7 @@ namespace ReadieFur::Service
         std::function<AService*(std::type_index)> _getServiceCallback = nullptr;
         std::unordered_set<std::type_index> _dependencies = {};
         Event::AutoResetEvent _taskEndedEvent;
-        TaskHandle_t* _taskHandle = nullptr; //I want to use this to test if the service is running however it doesn't seem to be working.
-        bool running = false;
+        TaskHandle_t _taskHandle = NULL;
         Event::CancellationTokenSource* _taskCts = nullptr;
 
         static void TaskWrapper(void* param)
@@ -38,30 +37,17 @@ namespace ReadieFur::Service
 
             self->_taskEndedEvent.Set();
 
-            if (!self->_taskCts->IsCancelled() || eTaskGetState(NULL) != eTaskState::eDeleted)
+            if (!self->_taskCts->IsCancelled())
             {
                 //Consider the task as failed here, this occurs when the RunServiceImpl method returns before the task has been signalled for deletion.
-                //For now, have the program fail like how tasks that end early in freertos call abort too.
+                //For now, have the program fail like how tasks that end early in FreeRTOS call abort too.
                 abort();
             }
             else
             {
                 self->_taskEndedEvent.Set();
+                vTaskDelete(NULL);
             }
-
-            //Have the task clean itself up.
-            // self->_serviceMutex.lock();
-
-            // if (self->_taskHandle != nullptr)
-            //     vTaskDelete(self->_taskHandle);
-            // self->_taskHandle = nullptr;
-
-            // delete self->_taskCts;
-            // self->_taskCts = nullptr;
-
-            // self->_taskEndedEvent.Set();
-
-            // self->_serviceMutex.unlock();
         }
 
         // bool ContainsCircularDependency(AService* service)
@@ -99,7 +85,7 @@ namespace ReadieFur::Service
         {
             _serviceMutex.lock();
 
-            if (_taskHandle != nullptr)
+            if (_taskHandle != NULL)
             {
                 _serviceMutex.unlock();
                 return EServiceResult::Ok;
@@ -114,11 +100,18 @@ namespace ReadieFur::Service
 
             #if configNUM_CORES > 1
             BaseType_t taskCreateResult;
-            if (ServiceEntrypointCore != -1 && ServiceEntrypointCore >= 0 && ServiceEntrypointCore < configNUM_CORES)
-                taskCreateResult = xTaskCreatePinnedToCore(TaskWrapper, buf, ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, _taskHandle, ServiceEntrypointCore);
+            if (ServiceEntrypointCore != -1)
+            {
+                if (ServiceEntrypointCore < 0 || ServiceEntrypointCore >= configNUM_CORES)
+                {
+                    //Invalid core specified.
+                    abort();
+                }
+                taskCreateResult = xTaskCreatePinnedToCore(TaskWrapper, buf, ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, &_taskHandle, ServiceEntrypointCore);
+            }
             else
             #endif
-                taskCreateResult = xTaskCreate(TaskWrapper, buf, ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, _taskHandle);
+                taskCreateResult = xTaskCreate(TaskWrapper, buf, ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, &_taskHandle);
 
             _serviceMutex.unlock();
 
@@ -128,7 +121,6 @@ namespace ReadieFur::Service
                 return EServiceResult::Failed;
             }
 
-            running = true;
             return EServiceResult::Ok;
         }
 
@@ -136,20 +128,14 @@ namespace ReadieFur::Service
         {
             _serviceMutex.lock();
             
-            if (_taskHandle == nullptr)
+            if (_taskHandle == NULL)
             {
                 _serviceMutex.unlock();
                 return EServiceResult::Ok;
             }
 
-            vTaskDelete(_taskHandle); //Redundant.
+            // vTaskDelete(_taskHandle);
             _taskCts->Cancel();
-            if (!_taskEndedEvent.WaitOne(timeout))
-            {
-                _serviceMutex.unlock();
-                return EServiceResult::Timeout;
-            }
-
             if (!_taskEndedEvent.WaitOne(timeout))
             {
                 _serviceMutex.unlock();
@@ -158,8 +144,7 @@ namespace ReadieFur::Service
 
             delete _taskCts;
             _taskCts = nullptr;
-            _taskHandle = nullptr;
-            running = false;
+            _taskHandle = NULL;
 
             _serviceMutex.unlock();
             return EServiceResult::Ok;
@@ -206,8 +191,7 @@ namespace ReadieFur::Service
         bool IsRunning()
         {
             // _serviceMutex.lock();
-            // bool retVal = (_taskHandle != nullptr);
-            bool retVal = running;
+            bool retVal = _taskHandle != NULL;
             // _serviceMutex.unlock();
             return retVal;
         }

@@ -108,7 +108,6 @@ namespace ReadieFur::Service
             delete service->second;
             _services.erase(std::type_index(typeid(T)));
 
-
             _mutex.unlock();
             return EServiceResult::Ok;
         }
@@ -143,10 +142,46 @@ namespace ReadieFur::Service
                 }
             }
 
-            service->second->StartService();
+            EServiceResult retVal = service->second->StartService();
 
             _mutex.unlock();
-            return EServiceResult::Ok;
+            return retVal;
+        }
+
+        template <typename T>
+        typename std::enable_if<std::is_base_of<AService, T>::value, EServiceResult>::type
+        static StopService()
+        {
+            _mutex.lock();
+
+            auto service = _services.find(std::type_index(typeid(T)));
+            if (service == _services.end())
+            {
+                _mutex.unlock();
+                return EServiceResult::NotInstalled;
+            }
+
+            if (!service->second->IsRunning())
+            {
+                _mutex.unlock();
+                return EServiceResult::Ok;
+            }
+
+            auto refService = _references.find(std::type_index(typeid(T)));
+            //Make sure none of the services that depend on this are running.
+            for (auto &&reference : refService->second)
+            {
+                if (reference->IsRunning())
+                {
+                    _mutex.unlock();
+                    return EServiceResult::InUse;
+                }
+            }
+
+            EServiceResult retVal = service->second->StopService();
+
+            _mutex.unlock();
+            return retVal;
         }
 
         template <typename T>

@@ -18,7 +18,7 @@ namespace ReadieFur::Diagnostic
     class DiagnosticsService : public ReadieFur::Service::AService
     {
     private:
-        static bool GetCpuTime(std::map<BaseType_t, uint32_t>& outRecordings)
+        static bool GetCpuTime(std::map<BaseType_t, int32_t>& outRecordings)
         {
             #if configUSE_TRACE_FACILITY == 1
             //Get idle time for all CPU cores.
@@ -35,6 +35,20 @@ namespace ReadieFur::Diagnostic
 
             free(tasksArray);
             return true;
+            #elif INCLUDE_xTaskGetIdleTaskHandle == 1 && false
+            for (size_t i = 0; i < configNUM_CORES; i++)
+            {
+                TaskHandle_t handle = xTaskGetIdleTaskHandleForCPU(i);
+                if (handle == NULL)
+                {
+                    outRecordings[0] = -1;
+                    continue;
+                }
+                return false;
+            }
+            #elif configGENERATE_RUN_TIME_STATS == 1 && configUSE_STATS_FORMATTING_FUNCTIONS == 1
+            ulTaskGetIdleRunTimeCounter()
+            return false;
             #else
             return false;
             #endif
@@ -75,7 +89,7 @@ namespace ReadieFur::Diagnostic
         {
             while (!ServiceCancellationToken.IsCancellationRequested())
             {
-                std::map<BaseType_t, uint32_t> cpuRecordings;
+                std::map<BaseType_t, int32_t> cpuRecordings;
                 if (GetCpuTime(cpuRecordings))
                 {
                     String cpuLogString;
