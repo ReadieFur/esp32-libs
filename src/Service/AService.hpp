@@ -15,6 +15,8 @@
 #include <functional>
 #include "Event/AutoResetEvent.hpp"
 #include "Event/CancellationToken.hpp"
+#include <string>
+#include "Logging.hpp"
 
 namespace ReadieFur::Service
 {
@@ -94,9 +96,39 @@ namespace ReadieFur::Service
             _taskCts = new Event::CancellationTokenSource();
             ServiceCancellationToken = _taskCts->GetToken();
 
+            #if true
+            std::string name;
+            std::string mangledName = typeid(*this).name();
+            if (!mangledName.empty())
+            {
+                size_t length = mangledName.length();
+
+                //Start from the end and read backwards, last char is always "E" so skip it.
+                for (size_t i = length - 2; i > 0; --i)
+                {
+                    char currentChar = mangledName[i];
+
+                    if (std::isdigit(currentChar))
+                        break; //Stop if we hit a digit, the class name always proceeds a digit.
+
+                    //Append the character to the class name (in reverse order).
+                    name.insert(name.begin(), currentChar);
+                }
+            }
+            else
+            {
+                name = xTaskGetTickCount();
+            }
+
+            name = "svc" + name;
+            if (name.length() > configMAX_TASK_NAME_LEN)
+                name = name.substr(0, configMAX_TASK_NAME_LEN);
+
+            const char* buf = name.c_str();
+            #else
             char buf[configMAX_TASK_NAME_LEN];
-            sprintf(buf, "srv%u", xTaskGetTickCount());
-            //typeid(*this).name()
+            sprintf(buf, "svc%012d", xTaskGetTickCount());
+            #endif
 
             #if configNUM_CORES > 1
             BaseType_t taskCreateResult;
@@ -110,8 +142,12 @@ namespace ReadieFur::Service
                 taskCreateResult = xTaskCreatePinnedToCore(TaskWrapper, buf, ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, &_taskHandle, ServiceEntrypointCore);
             }
             else
+            {
             #endif
                 taskCreateResult = xTaskCreate(TaskWrapper, buf, ServiceEntrypointStackDepth, this, ServiceEntrypointPriority, &_taskHandle);
+            #if configNUM_CORES > 1
+            }
+            #endif
 
             _serviceMutex.unlock();
 
