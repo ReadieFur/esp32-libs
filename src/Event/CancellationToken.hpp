@@ -48,8 +48,6 @@ namespace ReadieFur::Event
         
     private:
         std::mutex _mutex;
-        bool _configured = false;
-        TaskHandle_t _timeoutTask = nullptr;
 
         struct STimeoutCallbackParams
         {
@@ -65,7 +63,6 @@ namespace ReadieFur::Event
             params->self->Set();
             params->self->_mutex.unlock();
             vTaskDelete(NULL);
-            params->self->_timeoutTask = nullptr;
             delete params;
         }
 
@@ -76,12 +73,6 @@ namespace ReadieFur::Event
         {
             _mutex.lock();
 
-            if (_configured)
-            {
-                _mutex.unlock();
-                return false;
-            }
-
             char buf[configMAX_TASK_NAME_LEN];
             sprintf(buf, "cts%012d", xTaskGetTickCount());
 
@@ -90,13 +81,12 @@ namespace ReadieFur::Event
                 .self = this,
                 .timeoutTicks = timeoutTicks
             };
-            if (xTaskCreate(TimeoutCallback, buf, configIDLE_TASK_STACK_SIZE + 64, this, configMAX_PRIORITIES * 0.1, &_timeoutTask) != pdPASS)
+            if (xTaskCreate(TimeoutCallback, buf, configIDLE_TASK_STACK_SIZE + 64, this, configMAX_PRIORITIES * 0.1, nullptr) != pdPASS)
             {
                 delete params;
                 _mutex.unlock();
                 return false;
             }
-            _configured = true;
 
             _mutex.unlock();
             return true;
@@ -106,13 +96,6 @@ namespace ReadieFur::Event
         {
             _mutex.lock();
 
-            if (_configured)
-            {
-                _mutex.unlock();
-                return false;
-            }
-
-            _configured = true;
             Set();
 
             _mutex.unlock();
