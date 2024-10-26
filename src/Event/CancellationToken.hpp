@@ -4,6 +4,7 @@
 #include "AWaitHandle.hpp"
 #include <freertos/task.h>
 #include <freertos/FreeRTOSConfig.h>
+#include <freertos/portmacro.h>
 #include <mutex>
 
 namespace ReadieFur::Event
@@ -28,7 +29,7 @@ namespace ReadieFur::Event
                 return _cts == nullptr || _cts->IsSet();
             }
 
-            bool WaitForCancellation(TickType_t timeoutTicks)
+            bool WaitForCancellation(TickType_t timeoutTicks = portMAX_DELAY)
             {
                 if (_cts == nullptr)
                     return true;
@@ -82,7 +83,7 @@ namespace ReadieFur::Event
             }
 
             char buf[configMAX_TASK_NAME_LEN];
-            sprintf(buf, "cts%u", xTaskGetTickCount());
+            sprintf(buf, "cts%012d", xTaskGetTickCount());
 
             STimeoutCallbackParams* params = new STimeoutCallbackParams
             {
