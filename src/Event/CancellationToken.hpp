@@ -5,7 +5,6 @@
 #include <freertos/task.h>
 #include <freertos/FreeRTOSConfig.h>
 #include <freertos/portmacro.h>
-#include <mutex>
 
 namespace ReadieFur::Event
 {
@@ -47,8 +46,6 @@ namespace ReadieFur::Event
         };
         
     private:
-        std::mutex _mutex;
-
         struct STimeoutCallbackParams
         {
             CancellationTokenSource* self;
@@ -59,9 +56,7 @@ namespace ReadieFur::Event
         {
             STimeoutCallbackParams* params = reinterpret_cast<STimeoutCallbackParams*>(param);
             vTaskDelay(params->timeoutTicks);
-            params->self->_mutex.lock();
             params->self->Set();
-            params->self->_mutex.unlock();
             vTaskDelete(NULL);
             delete params;
         }
@@ -71,8 +66,6 @@ namespace ReadieFur::Event
     public:
         bool CancelAfter(TickType_t timeoutTicks)
         {
-            _mutex.lock();
-
             char buf[configMAX_TASK_NAME_LEN];
             sprintf(buf, "cts%012d", xTaskGetTickCount());
 
@@ -84,21 +77,15 @@ namespace ReadieFur::Event
             if (xTaskCreate(TimeoutCallback, buf, configIDLE_TASK_STACK_SIZE + 64, this, configMAX_PRIORITIES * 0.1, nullptr) != pdPASS)
             {
                 delete params;
-                _mutex.unlock();
                 return false;
             }
 
-            _mutex.unlock();
             return true;
         }
 
         bool Cancel()
         {
-            _mutex.lock();
-
             Set();
-
-            _mutex.unlock();
 
             return true;
         }
