@@ -5,6 +5,7 @@
 #include <freertos/task.h>
 #include <freertos/FreeRTOSConfig.h>
 #include <freertos/portmacro.h>
+#include <vector>
 
 namespace ReadieFur::Event
 {
@@ -17,20 +18,22 @@ namespace ReadieFur::Event
         friend class CancellationTokenSource;
         private:
             CancellationTokenSource* _cts;
+            bool _unreferenced;
 
-            SCancellationToken(CancellationTokenSource* cts) : _cts(cts) {}
+            SCancellationToken(CancellationTokenSource* cts) : _cts(cts), _unreferenced(false) {}
 
         public:
-            SCancellationToken() : _cts(nullptr) {}
+            SCancellationToken() : _cts(nullptr), _unreferenced(true) {}
 
             bool IsCancellationRequested()
             {
-                return _cts == nullptr || _cts->IsSet();
+                //TODO: _cts == nullptr has the potential to refer to a dangling pointer, fix this.
+                return _unreferenced || _cts == nullptr || _cts->IsSet();
             }
 
             bool WaitForCancellation(TickType_t timeoutTicks = portMAX_DELAY)
             {
-                if (_cts == nullptr)
+                if (_unreferenced || _cts == nullptr)
                     return true;
 
                 EventBits_t bitsSnapshot = xEventGroupWaitBits(
@@ -52,11 +55,13 @@ namespace ReadieFur::Event
             TickType_t timeoutTicks;
         };
 
+        std::vector<TaskHandle_t> _taskHandles;
+
         static void TimeoutCallback(void* param)
         {
             STimeoutCallbackParams* params = reinterpret_cast<STimeoutCallbackParams*>(param);
             vTaskDelay(params->timeoutTicks);
-            params->self->Set();
+            if (ulTaskNotifyTake(pdFALSE, 0) == 0) params->self->Set();
             vTaskDelete(NULL);
             delete params;
         }
@@ -64,6 +69,14 @@ namespace ReadieFur::Event
         bool WaitOne(TickType_t) override { return true; }
 
     public:
+        ~CancellationTokenSource()
+        {
+            for (auto &&handle : _taskHandles)
+                if (eTaskGetState(handle) != eTaskState::eDeleted)
+                    xTaskNotifyGive(handle);
+            _taskHandles.~vector();
+        }
+
         bool CancelAfter(TickType_t timeoutTicks)
         {
             char buf[configMAX_TASK_NAME_LEN];
@@ -74,11 +87,14 @@ namespace ReadieFur::Event
                 .self = this,
                 .timeoutTicks = timeoutTicks
             };
-            if (xTaskCreate(TimeoutCallback, buf, configIDLE_TASK_STACK_SIZE + 64, this, configMAX_PRIORITIES * 0.1, nullptr) != pdPASS)
+            TaskHandle_t handle;
+            if (xTaskCreate(TimeoutCallback, buf, configIDLE_TASK_STACK_SIZE + 64, this, configMAX_PRIORITIES * 0.1, &handle) != pdPASS)
             {
                 delete params;
                 return false;
             }
+
+            _taskHandles.push_back(handle);
 
             return true;
         }
