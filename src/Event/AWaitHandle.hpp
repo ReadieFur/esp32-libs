@@ -45,12 +45,12 @@ namespace ReadieFur::Event
 
         bool IsSet()
         {
-            return xEventGroupGetBits(_eventGroup) & (1 << 0) == (1 << 0);
+            return (xEventGroupGetBits(_eventGroup) & (1 << 0)) == (1 << 0);
         }
 
         bool IsSetISR()
         {
-            return xEventGroupGetBitsFromISR(_eventGroup) & (1 << 0) == (1 << 0);
+            return (xEventGroupGetBitsFromISR(_eventGroup) & (1 << 0)) == (1 << 0);
         }
     };
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <freertos/FreeRTOS.h>
+#include "Helpers.h"
 #include "AWaitHandle.hpp"
 #include <freertos/task.h>
 #include <freertos/FreeRTOSConfig.h>
@@ -69,7 +70,7 @@ namespace ReadieFur::Event
         bool WaitOne(TickType_t) override { return true; }
 
     public:
-        ~CancellationTokenSource()
+        virtual ~CancellationTokenSource()
         {
             for (auto &&handle : _taskHandles)
                 if (eTaskGetState(handle) != eTaskState::eDeleted)
@@ -88,7 +89,7 @@ namespace ReadieFur::Event
                 .timeoutTicks = timeoutTicks
             };
             TaskHandle_t handle;
-            if (xTaskCreate(TimeoutCallback, buf, configIDLE_TASK_STACK_SIZE + 64, this, configMAX_PRIORITIES * 0.1, &handle) != pdPASS)
+            if (xTaskCreate(TimeoutCallback, buf, IDLE_TASK_STACK_SIZE + 64, this, configMAX_PRIORITIES * 0.1, &handle) != pdPASS)
             {
                 delete params;
                 return false;
