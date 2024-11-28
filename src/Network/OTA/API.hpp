@@ -19,10 +19,19 @@ namespace ReadieFur::Network::OTA
         static esp_ota_handle_t _otaHandle;
         static const esp_partition_t* _otaPartition;
 
-        static esp_err_t OtaStart(httpd_req_t* req)
+        static esp_err_t OtaProcess(httpd_req_t* req)
         {
-            LOGI(nameof(OTA::API), "OTA upload started.");
+            esp_err_t err;
 
+            //Ensure we're not starting another OTA process during an ongoing one.
+            if (_otaHandle != 0)
+            {
+                LOGE(nameof(OTA::API), "An OTA process is already ongoing.");
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "An OTA process is already in progress");
+                return ESP_FAIL;
+            }
+
+            //Get the next available OTA partition.
             _otaPartition = esp_ota_get_next_update_partition(NULL);
             if (_otaPartition == nullptr)
             {
@@ -31,32 +40,40 @@ namespace ReadieFur::Network::OTA
                 return ESP_FAIL;
             }
 
-            esp_err_t err = esp_ota_begin(_otaPartition, OTA_SIZE_UNKNOWN, &_otaHandle);
+            //Start the OTA process.
+            LOGI(nameof(OTA::API), "OTA update started...");
+            err = esp_ota_begin(_otaPartition, OTA_SIZE_UNKNOWN, &_otaHandle);
             if (err != ESP_OK)
             {
                 LOGE(nameof(OTA::API), "esp_ota_begin failed: %s", esp_err_to_name(err));
                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA begin failed");
+                esp_ota_abort(_otaHandle);
+                _otaHandle = 0;
                 return ESP_FAIL;
             }
+            LOGV(nameof(OTA::API), "OTA partition initialized.");
 
-            LOGV(nameof(OTA::API), "OTA initialized.");
-            httpd_resp_set_status(req, "200 OK");
-            httpd_resp_send(req, "OTA Initialized", HTTPD_RESP_USE_STRLEN);
-            return ESP_OK;
-        }
-
-        static esp_err_t OtaData(httpd_req_t* req)
-        {
+            //Receive the data and write it to OTA.
+            TickType_t lastLog = 0;
             char buf[1024];
             int received;
-
+            int totalReceived = 0;
             while ((received = httpd_req_recv(req, buf, sizeof(buf))) > 0)
             {
-                esp_err_t err = esp_ota_write(_otaHandle, buf, received);
+                totalReceived += received;
+                if (xTaskGetTickCount() - lastLog > pdMS_TO_TICKS(500))
+                {
+                    LOGV(nameof(OTA::API), "Received %d/%d bytes...", totalReceived, req->content_len);
+                    lastLog = xTaskGetTickCount();
+                }
+
+                err = esp_ota_write(_otaHandle, buf, received);
                 if (err != ESP_OK)
                 {
                     LOGE(nameof(OTA::API), "OTA write failed: %s", esp_err_to_name(err));
                     httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA write failed");
+                    esp_ota_abort(_otaHandle);
+                    _otaHandle = 0;
                     return ESP_FAIL;
                 }
             }
@@ -64,22 +81,14 @@ namespace ReadieFur::Network::OTA
             if (received < 0)
             {
                 if (received == HTTPD_SOCK_ERR_TIMEOUT)
-                {
                     httpd_resp_send_408(req);
-                }
-                LOGE(nameof(OTA::API), "File reception failed.");
+                LOGE(nameof(OTA::API), "OTA file receive failed.");
                 return ESP_FAIL;
             }
+            LOGI(nameof(OTA::API), "OTA file received.");
 
-            LOGI(nameof(OTA::API), "OTA data written.");
-            httpd_resp_set_status(req, "200 OK");
-            httpd_resp_send(req, "Data received", HTTPD_RESP_USE_STRLEN);
-            return ESP_OK;
-        }
-
-        static esp_err_t OtaComplete(httpd_req_t* req)
-        {
-            esp_err_t err = esp_ota_end(_otaHandle);
+            //Finalize OTA and set boot partition.
+            err = esp_ota_end(_otaHandle);
             _otaHandle = 0;
             if (err != ESP_OK)
             {
@@ -88,10 +97,11 @@ namespace ReadieFur::Network::OTA
                 return ESP_FAIL;
             }
 
+            //https://www.esp32.com/viewtopic.php?t=2998
             err = esp_ota_set_boot_partition(_otaPartition);
             if (err != ESP_OK)
             {
-                LOGE(nameof(API::OTA), "Failed to set boot partition: %s", esp_err_to_name(err));
+                LOGE(nameof(OTA::API), "Failed to set boot partition: %s", esp_err_to_name(err));
                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to set boot partition");
                 return ESP_FAIL;
             }
@@ -99,6 +109,9 @@ namespace ReadieFur::Network::OTA
             LOGI(nameof(OTA::API), "OTA complete, restarting...");
             httpd_resp_set_status(req, "202 Accepted");
             httpd_resp_send(req, "OTA Complete, Restarting...", HTTPD_RESP_USE_STRLEN);
+            //Give the response time to send, from what I can tell the above function should be blocking but I think the
+            //restart call happens before it can properly send as the client doesn't get the response without this added delay.
+            vTaskDelay(pdMS_TO_TICKS(50));
             esp_restart();
 
             return ESP_OK;
@@ -129,27 +142,13 @@ namespace ReadieFur::Network::OTA
                 return err;
             }
 
-            httpd_uri_t _uriStart = {
-                .uri = "/ota/start",
+            httpd_uri_t _uriProcess = {
+                .uri = "/ota/process",
                 .method = HTTP_POST,
-                .handler = OtaStart,
+                .handler = OtaProcess,
                 .user_ctx = NULL
             };
-            httpd_uri_t _uriData = {
-                .uri = "/ota/data",
-                .method = HTTP_POST,
-                .handler = OtaData,
-                .user_ctx = NULL
-            };
-            httpd_uri_t _uriComplete = {
-                .uri = "/ota/complete",
-                .method = HTTP_POST,
-                .handler = OtaComplete,
-                .user_ctx = NULL
-            };
-            if ((err = httpd_register_uri_handler(_server, &_uriStart)) != ESP_OK
-                || (err = httpd_register_uri_handler(_server, &_uriData)) != ESP_OK
-                || (err = httpd_register_uri_handler(_server, &_uriComplete)) != ESP_OK)
+            if ((err = httpd_register_uri_handler(_server, &_uriProcess)) != ESP_OK)
             {
                 xSemaphoreGive(_instanceMutex);
                 LOGE(nameof(OTA::API), "Failed to register URI handler.");
