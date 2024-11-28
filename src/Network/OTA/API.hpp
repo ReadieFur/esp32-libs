@@ -126,11 +126,10 @@ namespace ReadieFur::Network::OTA
                 return ESP_FAIL;
             }
 
-            wifi_mode_t wifiMode = WiFi::GetMode();
-            if (wifiMode != WIFI_MODE_STA && wifiMode != WIFI_MODE_AP && wifiMode != WIFI_MODE_APSTA)
+            if (!WiFi::Initalized())
             {
                 xSemaphoreGive(_instanceMutex);
-                LOGE(nameof(OTA::API), "WiFi not in AP or STA mode.");
+                LOGE(nameof(OTA::API), "WiFi not initialized.");
                 return ESP_ERR_INVALID_STATE;
             }
 
