@@ -5,6 +5,7 @@
 #ifndef ARDUINO
 #include <sdkconfig.h>
 #endif
+#include "Logging.hpp"
 
 #define nameof(n) #n
 
