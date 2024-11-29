@@ -3,15 +3,12 @@
 // #include "Service/AService.hpp"
 #include <esp_log.h>
 #include <driver/uart.h>
-#if defined(WebSerial)
-#include <WebSerial.h>
-#elif defined(WebSerialLite)
-#include <WebSerialLite.h>
-#endif
 #ifdef ARDUINO
 #include <esp32-hal-log.h>
 #endif
 #include <stdio.h>
+#include <vector>
+#include <functional>
 
 #define PRINT(format, ...) ReadieFur::Logging::Print(format, ##__VA_ARGS__)
 #define WRITE(c) ReadieFur::Logging::Write(c)
@@ -36,7 +33,7 @@ namespace ReadieFur
     class Logging //: public Service::AService
     {
     private:
-        static int FormatWrite(int (*writer)(const char*, size_t), const char* format, va_list args)
+        static int FormatWrite(std::function<int(const char*, size_t)> writer, const char* format, va_list args)
         {
             //Based on esp32-hal-uart.c::log_printfv
             
@@ -81,6 +78,8 @@ namespace ReadieFur
         }
 
     public:
+        static std::vector<std::function<int(const char*, size_t)>> AdditionalLoggers;
+
         static void Log(esp_log_level_t level, const char* tag, const char* format, ...)
         {
             esp_log_level_t localLevel = esp_log_level_get(tag);
@@ -90,11 +89,21 @@ namespace ReadieFur
             va_list args;
             va_start(args, format);
 
-            esp_log_writev(level, tag, format, args); //TODO: Send to a logger that doesn't do any formatting as I do it manually above for the WebSerial call if enabled.
+            //The more loggers that are added the slower the program will be, even adding just one additional logger will slow the program down as we now have to do the formatting twice.
+            //I can resolve the above issue by outputting directly to the ESP log buffer instead of using the esp_log_writev function which will format the message internally.
+            //Reading through the esp-idf source code esp_log_writev writes to vprintf from stdio.h, so I should instead find a direct write function in this file.
+            //Given the internal log method uses vprintf, the output will go to the default IO stream so I don't need to find the output file that is used.
 
-            #if defined(WebSerial) || defined(WebSerialLite)
-            FormatWrite([](const char* data, size_t len) { return (int)WebSerial.write(reinterpret_cast<const uint8_t*>(data), len); }, format, args);
-            #endif
+            // esp_log_writev(level, tag, format, args);
+            
+            FormatWrite([](const char* data, size_t len)
+            {
+                // puts(data);
+                fputs(data, stdout); //Avoids the newline character that puts adds.
+                for (auto logger : AdditionalLoggers)
+                    logger(data, len);
+                return 0;
+            }, format, args);
 
             va_end(args);
         }
@@ -102,9 +111,6 @@ namespace ReadieFur
         static int Write(char c)
         {
             int lWritten = putchar(c);
-            #if defined(WebSerial) || defined(WebSerialLite)
-            WebSerial.write(c);
-            #endif
             return lWritten;
         }
 
@@ -117,9 +123,6 @@ namespace ReadieFur
             {
                 // int lWritten = uart_write_bytes(0, data, len); //STDOUT is typically UART0 (only works if initalized).
                 int lWritten = puts(data);
-                #if defined(WebSerial) || defined(WebSerialLite)
-                WebSerial.write(reinterpret_cast<const uint8_t*>(data), len);
-                #endif
                 return lWritten;
             }, format, args);
 
@@ -129,3 +132,5 @@ namespace ReadieFur
         }
     };
 };
+
+std::vector<std::function<int(const char*, size_t)>> ReadieFur::Logging::AdditionalLoggers;
