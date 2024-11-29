@@ -183,5 +183,5 @@ const size_t ReadieFur::Logging::BUFFER_SIZE = 128; //This value sets the maximu
 FILE* ReadieFur::Logging::ORIGINAL_STDOUT = stdout; //Set at program startup, should always be the original stdout.
 SemaphoreHandle_t ReadieFur::Logging::_mutex = xSemaphoreCreateMutex();
 char* ReadieFur::Logging::_buffer = nullptr;
-std::vector<std::function<int(const char*, size_t)>> ReadieFur::Logging::AdditionalLoggers;
 #endif
+std::vector<std::function<int(const char*, size_t)>> ReadieFur::Logging::AdditionalLoggers;
