@@ -95,7 +95,7 @@ namespace ReadieFur
             //Given the internal log method uses vprintf, the output will go to the default IO stream so I don't need to find the output file that is used.
 
             // esp_log_writev(level, tag, format, args);
-            
+
             //TODO: Set a custom log level/tag for each additional logger.
             //TODO: Change the stdout stream to a wrapped one that I can intercept and send to the additional loggers.
             FormatWrite([](const char* data, size_t len)
