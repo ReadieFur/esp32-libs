@@ -96,6 +96,8 @@ namespace ReadieFur
 
             // esp_log_writev(level, tag, format, args);
             
+            //TODO: Set a custom log level/tag for each additional logger.
+            //TODO: Change the stdout stream to a wrapped one that I can intercept and send to the additional loggers.
             FormatWrite([](const char* data, size_t len)
             {
                 // puts(data);
