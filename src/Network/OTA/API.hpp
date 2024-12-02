@@ -142,7 +142,7 @@ namespace ReadieFur::Network::OTA
             }
 
             httpd_uri_t _uriProcess = {
-                .uri = "/ota/process",
+                .uri = "/ota",
                 .method = HTTP_POST,
                 .handler = OtaProcess,
                 .user_ctx = NULL
