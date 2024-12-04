@@ -14,7 +14,6 @@ namespace ReadieFur::Network::OTA
     {
     private:
         static SemaphoreHandle_t _instanceMutex;
-        static httpd_config_t _config;
         static httpd_handle_t _server;
         static esp_ota_handle_t _otaHandle;
         static const esp_partition_t* _otaPartition;
@@ -118,8 +117,11 @@ namespace ReadieFur::Network::OTA
         }
 
     public:
-        static esp_err_t Init()
+        static esp_err_t Init(httpd_config_t* config = nullptr)
         {
+            if (config == nullptr)
+                return ESP_ERR_INVALID_ARG;
+
             if (xSemaphoreTake(_instanceMutex, 0) != pdTRUE)
             {
                 LOGE(nameof(OTA::API), "Failed to lock instance.");
@@ -134,7 +136,7 @@ namespace ReadieFur::Network::OTA
             }
 
             esp_err_t err = ESP_OK;
-            if ((err = httpd_start(&_server, &_config)) != ESP_OK)
+            if ((err = httpd_start(&_server, config)) != ESP_OK)
             {
                 xSemaphoreGive(_instanceMutex);
                 LOGE(nameof(OTA::API), "Failed to start HTTP server.");
@@ -171,7 +173,6 @@ namespace ReadieFur::Network::OTA
 };
 
 SemaphoreHandle_t ReadieFur::Network::OTA::API::_instanceMutex = xSemaphoreCreateMutex();
-httpd_config_t ReadieFur::Network::OTA::API::_config = HTTPD_DEFAULT_CONFIG();
 httpd_handle_t ReadieFur::Network::OTA::API::_server = NULL;
 esp_ota_handle_t ReadieFur::Network::OTA::API::_otaHandle = 0;
 const esp_partition_t* ReadieFur::Network::OTA::API::_otaPartition = nullptr;
