@@ -31,18 +31,19 @@ namespace ReadieFur::Network
                 return ESP_OK;
             }
 
-            esp_err_t err = nvs_flash_init();
-            if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
-            {
-                //NVS partition was modified and needs to be erased.
-                nvs_flash_erase();
-                err = nvs_flash_init();
-            }
-            if (err != ESP_OK)
-            {
-                xSemaphoreGive(_instanceMutex);
-                return err;
-            }
+            esp_err_t err;
+            // esp_err_t err = nvs_flash_init();
+            // if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+            // {
+            //     //NVS partition was modified and needs to be erased.
+            //     nvs_flash_erase();
+            //     err = nvs_flash_init();
+            // }
+            // if (err != ESP_OK)
+            // {
+            //     xSemaphoreGive(_instanceMutex);
+            //     return err;
+            // }
 
             if ((err = esp_netif_init()) != ESP_OK)
             {
