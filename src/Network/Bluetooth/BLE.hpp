@@ -393,7 +393,8 @@ namespace ReadieFur::Network::Bluetooth
             uint8_t rspKey = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
             uint8_t authOption = ESP_BLE_ONLY_ACCEPT_SPECIFIED_AUTH_DISABLE;
             uint8_t oobSupport = ESP_BLE_OOB_DISABLE;
-            esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &_passkey, sizeof(uint32_t));
+            if (_passkey != 0)
+                esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &_passkey, sizeof(uint32_t));
             esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &authReq, sizeof(uint8_t));
             esp_ble_gap_set_security_param(ESP_BLE_SM_IOCAP_MODE, &ioCap, sizeof(uint8_t));
             esp_ble_gap_set_security_param(ESP_BLE_SM_MIN_KEY_SIZE, &keySizeMin, sizeof(uint8_t));
@@ -444,6 +445,21 @@ namespace ReadieFur::Network::Bluetooth
             _initialized = false;
             _mutex.unlock();
             return err;
+        }
+
+        static void SetDeviceName(const char* deviceName)
+        {
+            _deviceName = deviceName;
+            esp_ble_gap_set_device_name(_deviceName);
+        }
+
+        static void SetPin(uint32_t passkey)
+        {
+            _passkey = passkey;
+            if (_passkey != 0)
+                esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &_passkey, sizeof(uint32_t));
+            else
+                esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, NULL, 0);
         }
 
         static bool IsInitialized()
