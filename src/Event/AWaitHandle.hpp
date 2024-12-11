@@ -2,6 +2,7 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
+#include <vector>
 
 namespace ReadieFur::Event
 {
@@ -19,7 +20,7 @@ namespace ReadieFur::Event
 
         virtual bool WaitOne(TickType_t timeout = portMAX_DELAY) = 0;
 
-        void Set()
+        virtual void Set()
         {
             //The return value if this method call can be used here to check if they were set, though for my use case I don't think I need to do this.
             xEventGroupSetBits(
@@ -28,27 +29,27 @@ namespace ReadieFur::Event
             ); 
         }
 
-        BaseType_t SetFromISR(BaseType_t *higherPriorityTaskWoken)
+        virtual BaseType_t SetFromISR(BaseType_t *higherPriorityTaskWoken)
         {
             return xEventGroupSetBitsFromISR(_eventGroup, (1 << 0), higherPriorityTaskWoken);
         }
 
-        void Clear()
+        virtual void Clear()
         {
             xEventGroupClearBits(_eventGroup, (1 << 0));
         }
 
-        BaseType_t ClearFromISR()
+        virtual BaseType_t ClearFromISR()
         {
             return xEventGroupClearBitsFromISR(_eventGroup, (1 << 0));
         }
 
-        bool IsSet()
+        virtual bool IsSet()
         {
             return (xEventGroupGetBits(_eventGroup) & (1 << 0)) == (1 << 0);
         }
 
-        bool IsSetISR()
+        virtual bool IsSetISR()
         {
             return (xEventGroupGetBitsFromISR(_eventGroup) & (1 << 0)) == (1 << 0);
         }

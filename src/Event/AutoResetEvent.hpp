@@ -10,7 +10,7 @@ namespace ReadieFur::Event
     class AutoResetEvent : public AWaitHandle
     {
     public:
-        bool WaitOne(TickType_t timeout  = portMAX_DELAY) override
+        bool WaitOne(TickType_t timeout = portMAX_DELAY) override
         {
             EventBits_t bitsSnapshot = xEventGroupWaitBits(
                 _eventGroup,
