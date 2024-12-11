@@ -41,7 +41,7 @@ namespace ReadieFur::Network::Bluetooth
         static esp_ble_adv_data_t _advertisingConfig;
         static esp_ble_adv_data_t _rspConfig;
         static esp_ble_adv_params_t _advertisingParams;
-        static const char* _deviceName;
+        static char* _deviceName;
         static uint32_t _passkey;
         static std::mutex _mutex;
         static uint8_t _advConfigDone;
@@ -130,7 +130,9 @@ namespace ReadieFur::Network::Bluetooth
                     return;
                 }
 
-                esp_ble_gap_set_device_name(_deviceName);
+                // LOGD(nameof(Bluetooth::BLE), "BLE device name: %s", _deviceName);
+                if (_deviceName != nullptr)
+                    esp_ble_gap_set_device_name(_deviceName);
                 esp_ble_gap_config_local_privacy(true);
 
                 auto profile = FindServerProfile(param->reg.app_id);
@@ -354,7 +356,7 @@ namespace ReadieFur::Network::Bluetooth
                 return ESP_ERR_INVALID_STATE;
             }
 
-            _deviceName = deviceName;
+            _deviceName = strdup(deviceName); //Helps prevent some std::string issues.
             _passkey = passkey;
 
             // err = nvs_flash_init();
@@ -442,6 +444,9 @@ namespace ReadieFur::Network::Bluetooth
             if ((err = esp_bt_controller_deinit()) != ESP_OK)
                 LOGE(nameof(Bluetooth::BLE), "Deinit BLE controller failed: %d", err);
 
+            if (_deviceName != nullptr)
+                free((void*)_deviceName);
+
             _initialized = false;
             _mutex.unlock();
             return err;
@@ -449,7 +454,9 @@ namespace ReadieFur::Network::Bluetooth
 
         static void SetDeviceName(const char* deviceName)
         {
-            _deviceName = deviceName;
+            if (_deviceName != nullptr)
+                free((void*)_deviceName);
+            _deviceName = strdup(deviceName);
             esp_ble_gap_set_device_name(_deviceName);
         }
 
@@ -606,7 +613,7 @@ esp_ble_adv_params_t ReadieFur::Network::Bluetooth::BLE::_advertisingParams =
     .channel_map        = ADV_CHNL_ALL,
     .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
-const char* ReadieFur::Network::Bluetooth::BLE::_deviceName = NULL;
+char* ReadieFur::Network::Bluetooth::BLE::_deviceName = nullptr;
 uint32_t ReadieFur::Network::Bluetooth::BLE::_passkey;
 std::mutex ReadieFur::Network::Bluetooth::BLE::_mutex;
 uint8_t ReadieFur::Network::Bluetooth::BLE::_advConfigDone = 0;
