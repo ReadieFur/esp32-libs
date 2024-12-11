@@ -354,6 +354,9 @@ namespace ReadieFur::Network::Bluetooth
                 return ESP_ERR_INVALID_STATE;
             }
 
+            _deviceName = deviceName;
+            _passkey = passkey;
+
             // err = nvs_flash_init();
             // if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
             // {
