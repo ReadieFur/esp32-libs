@@ -218,12 +218,11 @@ namespace ReadieFur::Network::Bluetooth
         esp_err_t AddAttribute(
             SUUID uuid,
             uint16_t permissions,
-            uint16_t maxLength,
             TGattServerReadCallback readCallback = nullptr,
             TGattServerWriteCallback writeCallback = nullptr
         )
         {
-            return AddAttribute(uuid, permissions, NULL, 0, maxLength, false, readCallback, writeCallback);
+            return AddAttribute(uuid, permissions, NULL, 0, 0, false, readCallback, writeCallback);
         }
         #pragma endregion
 
