@@ -9,12 +9,11 @@
 
 namespace ReadieFur::Event
 {
+    typedef uint32_t TObservableHandle;
+
     template <typename T>
     class Observable
     {
-    public:
-        typedef uint32_t TObservableHandle;
-
     private:
         //Advanced setup to allow for unsyncnonused event groups.
         struct SGroupInfo
@@ -29,6 +28,14 @@ namespace ReadieFur::Event
 
     public:
         Observable()
+        {
+            _groups[0] = SGroupInfo {
+                .group = xEventGroupCreate(),
+                .handles = { (1 << 0) }
+            };
+        }
+
+        Observable(T value) : _value(value)
         {
             _groups[0] = SGroupInfo {
                 .group = xEventGroupCreate(),
