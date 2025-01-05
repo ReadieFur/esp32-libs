@@ -130,8 +130,8 @@ namespace ReadieFur::Service
             sprintf(buf, "svc%012d", xTaskGetTickCount());
             #endif
 
-            #if configNUM_CORES > 1
             BaseType_t taskCreateResult;
+            #if configNUM_CORES > 1
             if (ServiceEntrypointCore != -1)
             {
                 if (ServiceEntrypointCore < 0 || ServiceEntrypointCore >= configNUM_CORES)
