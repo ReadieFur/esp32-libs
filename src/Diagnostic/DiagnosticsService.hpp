@@ -2,7 +2,6 @@
 
 #include "Service/AService.hpp"
 #include <stdlib.h>
-#include <string.h>
 #include <map>
 #include <esp_heap_caps.h>
 #include <freertos/task.h>
@@ -10,7 +9,7 @@
 #include "Logging.hpp"
 #include "Helpers.h"
 #include <freertos/FreeRTOSConfig.h>
-#include <WString.h>
+#include <string>
 #include <Service/ServiceManager.hpp>
 
 namespace ReadieFur::Diagnostic
@@ -92,7 +91,7 @@ namespace ReadieFur::Diagnostic
                 std::map<BaseType_t, int32_t> cpuRecordings;
                 if (GetCpuTime(cpuRecordings))
                 {
-                    String cpuLogString;
+                    std::string cpuLogString;
                     for (auto &&recording : cpuRecordings)
                     {
                         cpuLogString += "CPU";
@@ -101,8 +100,8 @@ namespace ReadieFur::Diagnostic
                         cpuLogString += recording.second;
                         cpuLogString += ", ";
                     }
-                    if (cpuLogString.endsWith(", "))
-                        cpuLogString = cpuLogString.substring(0, cpuLogString.length() - 2);
+                    if (cpuLogString.ends_with(", "))
+                        cpuLogString = cpuLogString.substr(0, cpuLogString.length() - 2);
                     cpuRecordings.clear();
                     LOGD(nameof(DiagnosticsService), "%s", cpuLogString.c_str());
                     cpuLogString.clear();
@@ -115,7 +114,7 @@ namespace ReadieFur::Diagnostic
                 std::map<const char*, size_t> taskRecordings;
                 if (GetTasksFreeStack(taskRecordings))
                 {
-                    String tasksLogString;
+                    std::string tasksLogString;
                     for (auto &&recording : taskRecordings)
                     {
                     }

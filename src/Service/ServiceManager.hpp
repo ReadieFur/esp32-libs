@@ -185,6 +185,16 @@ namespace ReadieFur::Service
         }
 
         template <typename T>
+        typename std::enable_if<std::is_base_of<AService, T>::value, EServiceResult>::type
+        static InstallAndStartService()
+        {
+            EServiceResult result = InstallService<T>();
+            if (result != EServiceResult::Ok)
+                return result;
+            return StartService<T>();
+        }
+
+        template <typename T>
         typename std::enable_if<std::is_base_of<AService, T>::value, T*>::type
         static GetService()
         {

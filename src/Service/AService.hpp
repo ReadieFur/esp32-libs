@@ -1,6 +1,7 @@
 #pragma once
 
 #include <freertos/FreeRTOS.h>
+#include "Helpers.h"
 #include "EServiceResult.h"
 #include <mutex>
 #include <functional>
@@ -151,7 +152,7 @@ namespace ReadieFur::Service
 
             _serviceMutex.unlock();
 
-            if (!taskCreateResult == pdPASS)
+            if (taskCreateResult != pdPASS)
             {
                 delete _taskCts;
                 return EServiceResult::Failed;
@@ -190,7 +191,7 @@ namespace ReadieFur::Service
         virtual void RunServiceImpl() = 0;
 
         uint ServiceEntrypointPriority = configMAX_PRIORITIES * 0.1;
-        uint ServiceEntrypointStackDepth = configIDLE_TASK_STACK_SIZE;
+        uint ServiceEntrypointStackDepth = IDLE_TASK_STACK_SIZE;
         int ServiceEntrypointCore = -1; //-1 to run on all cores.
         Event::CancellationTokenSource::SCancellationToken ServiceCancellationToken; //Defaults to true, which is ideal.
 
@@ -230,6 +231,15 @@ namespace ReadieFur::Service
             bool retVal = _taskHandle != NULL;
             // _serviceMutex.unlock();
             return retVal;
+        }
+
+        virtual ~AService()
+        {
+            if (_taskHandle != NULL)
+            {
+                //TODO: Force kill the task.
+                StopService();
+            }
         }
     };
 };

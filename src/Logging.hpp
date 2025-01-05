@@ -3,15 +3,17 @@
 // #include "Service/AService.hpp"
 #include <esp_log.h>
 #include <driver/uart.h>
-#if defined(WebSerial)
-#include <WebSerial.h>
-#elif defined(WebSerialLite)
-#include <WebSerialLite.h>
-#endif
 #ifdef ARDUINO
 #include <esp32-hal-log.h>
 #endif
 #include <stdio.h>
+#include <vector>
+#include <functional>
+#ifdef _ENABLE_STDOUT_HOOK
+#include <freertos/semphr.h>
+#endif
+
+// #define _ENABLE_STDOUT_HOOK
 
 #define PRINT(format, ...) ReadieFur::Logging::Print(format, ##__VA_ARGS__)
 #define WRITE(c) ReadieFur::Logging::Write(c)
@@ -36,7 +38,14 @@ namespace ReadieFur
     class Logging //: public Service::AService
     {
     private:
-        static int FormatWrite(int (*writer)(const char*, size_t), const char* format, va_list args)
+        #ifdef _ENABLE_STDOUT_HOOK
+        static const size_t BUFFER_SIZE;
+        static FILE* ORIGINAL_STDOUT;
+        static SemaphoreHandle_t _mutex;
+        static char* _buffer;
+        #endif
+
+        static int FormatWrite(std::function<int(const char*, size_t)> writer, const char* format, va_list args)
         {
             //Based on esp32-hal-uart.c::log_printfv
             
@@ -80,7 +89,36 @@ namespace ReadieFur
             return written;
         }
 
+        #ifdef _ENABLE_STDOUT_HOOK
+        static int StdoutHook(void* cookie, const char* data, int size)
+        {
+            int retval = fputs(data, ORIGINAL_STDOUT); //Avoids the newline character that puts adds.
+            for (auto logger : AdditionalLoggers)
+                logger(data, size);
+            return retval;
+        }
+        #endif
+
     public:
+        static std::vector<std::function<int(const char*, size_t)>> AdditionalLoggers;
+
+        #ifdef _ENABLE_STDOUT_HOOK
+        //DO NOT USE THIS FOR NOW, IT IS NOT COMPLETE.
+        static void OverrideStdout()
+        {
+            xSemaphoreTake(_mutex, portMAX_DELAY);
+            if (_buffer != nullptr)
+            {
+                xSemaphoreGive(_mutex);
+                return;
+            }
+            _buffer = (char*)malloc(BUFFER_SIZE);
+            stdout = fwopen(NULL, &StdoutHook);
+            setvbuf(stdout, _buffer, _IOLBF, BUFFER_SIZE);
+            xSemaphoreGive(_mutex);
+        }
+        #endif
+
         static void Log(esp_log_level_t level, const char* tag, const char* format, ...)
         {
             esp_log_level_t localLevel = esp_log_level_get(tag);
@@ -90,10 +128,26 @@ namespace ReadieFur
             va_list args;
             va_start(args, format);
 
-            esp_log_writev(level, tag, format, args); //TODO: Send to a logger that doesn't do any formatting as I do it manually above for the WebSerial call if enabled.
+            //The more loggers that are added the slower the program will be, even adding just one additional logger will slow the program down as we now have to do the formatting twice.
+            //I can resolve the above issue by outputting directly to the ESP log buffer instead of using the esp_log_writev function which will format the message internally.
+            //Reading through the esp-idf source code esp_log_writev writes to vprintf from stdio.h, so I should instead find a direct write function in this file.
+            //Given the internal log method uses vprintf, the output will go to the default IO stream so I don't need to find the output file that is used.
 
-            #if defined(WebSerial) || defined(WebSerialLite)
-            FormatWrite([](const char* data, size_t len) { return (int)WebSerial.write(reinterpret_cast<const uint8_t*>(data), len); }, format, args);
+            #ifdef _ENABLE_STDOUT_HOOK
+            esp_log_writev(level, tag, format, args);
+            #endif
+
+            //TODO: Set a custom log level/tag for each additional logger.
+            //TODO: Change the stdout stream to a wrapped one that I can intercept and send to the additional loggers.
+            #ifndef _ENABLE_STDOUT_HOOK
+            FormatWrite([](const char* data, size_t len)
+            {
+                // puts(data);
+                fputs(data, stdout); //Avoids the newline character that puts adds.
+                for (auto logger : AdditionalLoggers)
+                    logger(data, len);
+                return 0;
+            }, format, args);
             #endif
 
             va_end(args);
@@ -102,9 +156,6 @@ namespace ReadieFur
         static int Write(char c)
         {
             int lWritten = putchar(c);
-            #if defined(WebSerial) || defined(WebSerialLite)
-            WebSerial.write(c);
-            #endif
             return lWritten;
         }
 
@@ -117,9 +168,6 @@ namespace ReadieFur
             {
                 // int lWritten = uart_write_bytes(0, data, len); //STDOUT is typically UART0 (only works if initalized).
                 int lWritten = puts(data);
-                #if defined(WebSerial) || defined(WebSerialLite)
-                WebSerial.write(reinterpret_cast<const uint8_t*>(data), len);
-                #endif
                 return lWritten;
             }, format, args);
 
@@ -129,3 +177,11 @@ namespace ReadieFur
         }
     };
 };
+
+#ifdef _ENABLE_STDOUT_HOOK
+const size_t ReadieFur::Logging::BUFFER_SIZE = 128; //This value sets the maximum buffer before flushing. If the data is larger than this then it will be flushed in multiple parts.
+FILE* ReadieFur::Logging::ORIGINAL_STDOUT = stdout; //Set at program startup, should always be the original stdout.
+SemaphoreHandle_t ReadieFur::Logging::_mutex = xSemaphoreCreateMutex();
+char* ReadieFur::Logging::_buffer = nullptr;
+#endif
+std::vector<std::function<int(const char*, size_t)>> ReadieFur::Logging::AdditionalLoggers;
