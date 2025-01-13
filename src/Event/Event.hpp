@@ -10,25 +10,25 @@ namespace ReadieFur::Event
 {
     /*TODO: Change this to notify FreeRTOS tasks to run their own callbacks instead so that the task calling the dispatch
     method doesn't have to worry about having a large enough stack size for all of the callbacks.*/
-    template <typename T>
+    template </*typename RetVal, */typename... ArgTypes>
     class Event
     {
     private:
         std::mutex _mutex;
-        std::map<TickType_t, std::function<void(T)>> _callbacks;
+        std::map<TickType_t, std::function<void(ArgTypes...)>> _callbacks;
 
     public:
-        void Dispatch(T value)
+        void Dispatch(ArgTypes... values)
         {
             _mutex.lock();
 
             for (auto &&kvp : _callbacks)
-                kvp.second(value);
+                kvp.second(values...);
 
             _mutex.unlock();
         }
 
-        TickType_t Add(std::function<void(T)> callback)
+        TickType_t Add(std::function<void(ArgTypes...)> callback)
         {
             _mutex.lock();
 
@@ -51,7 +51,7 @@ namespace ReadieFur::Event
         }
 
         /// @return Returns the number of callbacks removed.
-        size_t Remove(std::function<void(T)> callback)
+        size_t Remove(std::function<void(ArgTypes...)> callback)
         {
             std::list<TickType_t> callbacksToRemove;
 
