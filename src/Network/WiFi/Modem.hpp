@@ -7,9 +7,9 @@
 #include "Event/Event.hpp"
 #include <mutex>
 
-namespace ReadieFur::Network
+namespace ReadieFur::Network::WiFi
 {
-    class WiFi
+    class Modem
     {
     private:
         static std::mutex _mutex;
@@ -118,7 +118,7 @@ namespace ReadieFur::Network
             if ((err = esp_wifi_set_config(interface, &config)) != ESP_OK
                 || (err = esp_wifi_start()) != ESP_OK)
             {
-                LOGE(nameof(WiFi), "Failed to configure WiFi interface (%i): %s", interface, esp_err_to_name(err));
+                LOGE(nameof(Modem), "Failed to configure WiFi interface (%i): %s", interface, esp_err_to_name(err));
                 return err;
             }
 
@@ -190,8 +190,8 @@ namespace ReadieFur::Network
     };
 };
 
-std::mutex ReadieFur::Network::WiFi::_mutex;
-bool ReadieFur::Network::WiFi::_initalized = false;
-esp_netif_t* ReadieFur::Network::WiFi::_staNet = nullptr;
-esp_netif_t* ReadieFur::Network::WiFi::_apNet = nullptr;
-ReadieFur::Event::Event<wifi_mode_t> ReadieFur::Network::WiFi::OnModeChanged = Event::Event<wifi_mode_t>();
+std::mutex ReadieFur::Network::WiFi::Modem::_mutex;
+bool ReadieFur::Network::WiFi::Modem::_initalized = false;
+esp_netif_t* ReadieFur::Network::WiFi::Modem::_staNet = nullptr;
+esp_netif_t* ReadieFur::Network::WiFi::Modem::_apNet = nullptr;
+ReadieFur::Event::Event<wifi_mode_t> ReadieFur::Network::WiFi::Modem::OnModeChanged = Event::Event<wifi_mode_t>();

@@ -6,11 +6,11 @@
 #include <esp_system.h>
 #include "Logging.hpp"
 #include <freertos/semphr.h>
-#include "Network/WiFi.hpp"
+#include "Modem.hpp"
 
-namespace ReadieFur::Network::OTA
+namespace ReadieFur::Network::WiFi
 {
-    class API
+    class OTA
     {
     private:
         static SemaphoreHandle_t _instanceMutex;
@@ -27,7 +27,7 @@ namespace ReadieFur::Network::OTA
             //Ensure we're not starting another OTA process during an ongoing one.
             if (_otaHandle != 0)
             {
-                LOGE(nameof(OTA::API), "An OTA process is already ongoing.");
+                LOGE(nameof(WiFi::OTA), "An OTA process is already ongoing.");
                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "An OTA process is already in progress");
                 return ESP_FAIL;
             }
@@ -36,23 +36,23 @@ namespace ReadieFur::Network::OTA
             _otaPartition = esp_ota_get_next_update_partition(NULL);
             if (_otaPartition == nullptr)
             {
-                LOGE(nameof(OTA::API), "No OTA partition found.");
+                LOGE(nameof(WiFi::OTA), "No OTA partition found.");
                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No OTA partition found.");
                 return ESP_FAIL;
             }
 
             //Start the OTA process.
-            LOGI(nameof(OTA::API), "OTA update started...");
+            LOGI(nameof(WiFi::OTA), "OTA update started...");
             err = esp_ota_begin(_otaPartition, OTA_SIZE_UNKNOWN, &_otaHandle);
             if (err != ESP_OK)
             {
-                LOGE(nameof(OTA::API), "esp_ota_begin failed: %s", esp_err_to_name(err));
+                LOGE(nameof(WiFi::OTA), "esp_ota_begin failed: %s", esp_err_to_name(err));
                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA begin failed");
                 esp_ota_abort(_otaHandle);
                 _otaHandle = 0;
                 return ESP_FAIL;
             }
-            LOGV(nameof(OTA::API), "OTA partition initialized.");
+            LOGV(nameof(WiFi::OTA), "OTA partition initialized.");
 
             //Receive the data and write it to OTA.
             TickType_t lastLog = 0;
@@ -65,14 +65,14 @@ namespace ReadieFur::Network::OTA
                 TickType_t now = xTaskGetTickCount();
                 if (now - lastLog > pdMS_TO_TICKS(500))
                 {
-                    LOGV(nameof(OTA::API), "Received %d/%d bytes...", totalReceived, req->content_len);
+                    LOGV(nameof(WiFi::OTA), "Received %d/%d bytes...", totalReceived, req->content_len);
                     lastLog = now;
                 }
 
                 err = esp_ota_write(_otaHandle, buf, received);
                 if (err != ESP_OK)
                 {
-                    LOGE(nameof(OTA::API), "OTA write failed: %s", esp_err_to_name(err));
+                    LOGE(nameof(WiFi::OTA), "OTA write failed: %s", esp_err_to_name(err));
                     httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA write failed");
                     esp_ota_abort(_otaHandle);
                     _otaHandle = 0;
@@ -88,17 +88,17 @@ namespace ReadieFur::Network::OTA
             {
                 if (received == HTTPD_SOCK_ERR_TIMEOUT)
                     httpd_resp_send_408(req);
-                LOGE(nameof(OTA::API), "OTA file receive failed.");
+                LOGE(nameof(WiFi::OTA), "OTA file receive failed.");
                 return ESP_FAIL;
             }
-            LOGI(nameof(OTA::API), "OTA file received.");
+            LOGI(nameof(WiFi::OTA), "OTA file received.");
 
             //Finalize OTA and set boot partition.
             err = esp_ota_end(_otaHandle);
             _otaHandle = 0;
             if (err != ESP_OK)
             {
-                LOGE(nameof(OTA::API), "OTA end failed: %s", esp_err_to_name(err));
+                LOGE(nameof(WiFi::OTA), "OTA end failed: %s", esp_err_to_name(err));
                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA end failed");
                 return ESP_FAIL;
             }
@@ -107,12 +107,12 @@ namespace ReadieFur::Network::OTA
             err = esp_ota_set_boot_partition(_otaPartition);
             if (err != ESP_OK)
             {
-                LOGE(nameof(OTA::API), "Failed to set boot partition: %s", esp_err_to_name(err));
+                LOGE(nameof(WiFi::OTA), "Failed to set boot partition: %s", esp_err_to_name(err));
                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to set boot partition");
                 return ESP_FAIL;
             }
 
-            LOGI(nameof(OTA::API), "OTA complete, restarting...");
+            LOGI(nameof(WiFi::OTA), "OTA complete, restarting...");
             httpd_resp_set_status(req, "202 Accepted");
             httpd_resp_send(req, "OTA Complete, Restarting...", HTTPD_RESP_USE_STRLEN);
             //Give the response time to send, from what I can tell the above function should be blocking but I think the
@@ -131,14 +131,14 @@ namespace ReadieFur::Network::OTA
 
             if (xSemaphoreTake(_instanceMutex, 0) != pdTRUE)
             {
-                LOGE(nameof(OTA::API), "Failed to lock instance.");
+                LOGE(nameof(WiFi::OTA), "Failed to lock instance.");
                 return ESP_FAIL;
             }
 
-            if (!WiFi::Initalized())
+            if (!Modem::Initalized())
             {
                 xSemaphoreGive(_instanceMutex);
-                LOGE(nameof(OTA::API), "WiFi not initialized.");
+                LOGE(nameof(WiFi::OTA), "WiFi not initialized.");
                 return ESP_ERR_INVALID_STATE;
             }
 
@@ -149,7 +149,7 @@ namespace ReadieFur::Network::OTA
             if ((err = httpd_start(&_server, config)) != ESP_OK)
             {
                 xSemaphoreGive(_instanceMutex);
-                LOGE(nameof(OTA::API), "Failed to start HTTP server.");
+                LOGE(nameof(WiFi::OTA), "Failed to start HTTP server.");
                 return err;
             }
 
@@ -162,11 +162,11 @@ namespace ReadieFur::Network::OTA
             if ((err = httpd_register_uri_handler(_server, &_uriProcess)) != ESP_OK)
             {
                 xSemaphoreGive(_instanceMutex);
-                LOGE(nameof(OTA::API), "Failed to register URI handler.");
+                LOGE(nameof(WiFi::OTA), "Failed to register URI handler.");
                 return err;
             }
 
-            LOGV(nameof(OTA::API), "HTTP server started.");
+            LOGV(nameof(WiFi::OTA), "HTTP server started.");
             return ESP_OK;
         }
 
@@ -177,14 +177,14 @@ namespace ReadieFur::Network::OTA
             _otaHandle = 0;
             _otaPartition = nullptr;
             xSemaphoreGive(_instanceMutex);
-            LOGV(nameof(OTA::API), "HTTP server stopped.");
+            LOGV(nameof(WiFi::OTA), "HTTP server stopped.");
         }
     };
 };
 
-SemaphoreHandle_t ReadieFur::Network::OTA::API::_instanceMutex = xSemaphoreCreateMutex();
-httpd_handle_t ReadieFur::Network::OTA::API::_server = NULL;
-esp_ota_handle_t ReadieFur::Network::OTA::API::_otaHandle = 0;
-const esp_partition_t* ReadieFur::Network::OTA::API::_otaPartition = nullptr;
-size_t ReadieFur::Network::OTA::API::_otaRecvBufferSize = 1024;
-uint ReadieFur::Network::OTA::API::_otaRecvIntervalMs = 0;
+SemaphoreHandle_t ReadieFur::Network::WiFi::OTA::_instanceMutex = xSemaphoreCreateMutex();
+httpd_handle_t ReadieFur::Network::WiFi::OTA::_server = NULL;
+esp_ota_handle_t ReadieFur::Network::WiFi::OTA::_otaHandle = 0;
+const esp_partition_t* ReadieFur::Network::WiFi::OTA::_otaPartition = nullptr;
+size_t ReadieFur::Network::WiFi::OTA::_otaRecvBufferSize = 1024;
+uint ReadieFur::Network::WiFi::OTA::_otaRecvIntervalMs = 0;
