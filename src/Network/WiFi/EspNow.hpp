@@ -21,7 +21,7 @@ namespace ReadieFur::Network::WiFi
     class EspNow
     {
     public:
-        typedef std::function<void(const esp_now_recv_info_t* info, const uint8_t* data, int len)> TEspNowReceiveCallback;
+        typedef std::function<void(const uint8_t* peerMacAddress, const uint8_t* data, int len)> TEspNowReceiveCallback;
         static Event::Event<const uint8_t*, uint8_t, bool> OnPeerDiscovered;
 
     private:
@@ -41,7 +41,11 @@ namespace ReadieFur::Network::WiFi
             EspNowOp_Max
         };
 
+        #ifdef ARDUINO
+        static void OnReceive(const uint8_t* macAddress, const uint8_t* data, int len)
+        #else
         static void OnReceive(const esp_now_recv_info_t* info, const uint8_t* data, int len)
+        #endif
         {
             //Mutex locks will not happen at the root of this function, avoids deadlocks that could otherwise occur.
 
@@ -56,13 +60,20 @@ namespace ReadieFur::Network::WiFi
                 return;
             }
 
+            const uint8_t* srcMacAddress;
+            #ifdef ARDUINO
+            srcMacAddress = macAddress;
+            #else
+            srcMacAddress = info->src_addr;
+            #endif
+
             switch (operation)
             {
                 case EOperation::EspNowOp_Message:
                 {
                     //Forward the message onto any registered callbacks.
                     for (auto &&callback : _receiveCallbacks)
-                        callback(info, payload, payloadLen);
+                        callback(srcMacAddress, payload, payloadLen);
                     break;
                 }
                 case EOperation::EspNowOp_Autodiscover:
@@ -74,9 +85,9 @@ namespace ReadieFur::Network::WiFi
                     }
 
                     //Add the sender as a client (so we can send the response), assuming no encryption. My assumption is that if an encryption key is set on the device we are sending to transmission will fail?
-                    if (!esp_now_is_peer_exist(info->src_addr))
+                    if (!esp_now_is_peer_exist(srcMacAddress))
                     {
-                        esp_err_t err = AddOrUpdatePeer(info->src_addr);
+                        esp_err_t err = AddOrUpdatePeer(srcMacAddress);
                         if (err != ESP_OK)
                         {
                             LOGE(nameof(WiFi::EspNow), "Failed to add peer: %s", esp_err_to_name(err));
@@ -102,7 +113,7 @@ namespace ReadieFur::Network::WiFi
                     *(responsePayload) = channel;
                     *(responsePayload + sizeof(uint8_t)) = doEncryption;
 
-                    Send(EOperation::EspNowOp_AutodiscoverResponse, info->src_addr, responsePayload, sizeof(responsePayload));
+                    Send(EOperation::EspNowOp_AutodiscoverResponse, srcMacAddress, responsePayload, sizeof(responsePayload));
                     break;
                 }
                 case EOperation::EspNowOp_AutodiscoverResponse:
@@ -115,21 +126,20 @@ namespace ReadieFur::Network::WiFi
                     }
 
                     //Build peer info.
-                    uint8_t* peerMac = info->src_addr;
                     uint8_t channel = *(payload);
                     bool doEncryption = *(payload + sizeof(uint8_t));
 
                     //Check if the peer is already in the list.
-                    if (esp_now_is_peer_exist(peerMac))
+                    if (esp_now_is_peer_exist(srcMacAddress))
                     {
                         //Peer already exists in known connections, skip.
                         return;
                     }
 
                     //Add the peer to the list.
-                    AddOrUpdatePeer(peerMac);
+                    AddOrUpdatePeer(srcMacAddress);
 
-                    OnPeerDiscovered.Dispatch(peerMac, channel, doEncryption);
+                    OnPeerDiscovered.Dispatch(srcMacAddress, channel, doEncryption);
                     break;
                 }
                 case EOperation::EspNowOp_Invalid:
@@ -330,7 +340,11 @@ namespace ReadieFur::Network::WiFi
             return ESP_OK;
         }
 
+        #ifdef ARDUINO
+        static esp_err_t SetPowerSaving(uint16_t wakeIntervalMs = 0)
+        #else
         static esp_err_t SetPowerSaving(uint16_t wakeIntervalMs = ESP_WIFI_CONNECTIONLESS_INTERVAL_DEFAULT_MODE)
+        #endif
         {
             __ESP_NOW_LOCK();
 
@@ -341,12 +355,14 @@ namespace ReadieFur::Network::WiFi
                 return err;
             }
 
+            #ifndef ARDUINO
             err = esp_wifi_connectionless_module_set_wake_interval(wakeIntervalMs);
             if (err != ESP_OK)
             {
                 LOGE(nameof(WiFi::EspNow), "Failed to set power saving: %s", esp_err_to_name(err));
                 return err;
             }
+            #endif
 
             return ESP_OK;
         }
