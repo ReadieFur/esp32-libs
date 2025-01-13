@@ -17,6 +17,8 @@ namespace ReadieFur::Network::OTA
         static httpd_handle_t _server;
         static esp_ota_handle_t _otaHandle;
         static const esp_partition_t* _otaPartition;
+        static size_t _otaRecvBufferSize;
+        static uint _otaRecvIntervalMs;
 
         static esp_err_t OtaProcess(httpd_req_t* req)
         {
@@ -54,16 +56,17 @@ namespace ReadieFur::Network::OTA
 
             //Receive the data and write it to OTA.
             TickType_t lastLog = 0;
-            char buf[1024];
+            char buf[_otaRecvBufferSize];
             int received;
             int totalReceived = 0;
-            while ((received = httpd_req_recv(req, buf, sizeof(buf))) > 0)
+            while ((received = httpd_req_recv(req, buf, _otaRecvBufferSize)) > 0)
             {
                 totalReceived += received;
-                if (xTaskGetTickCount() - lastLog > pdMS_TO_TICKS(500))
+                TickType_t now = xTaskGetTickCount();
+                if (now - lastLog > pdMS_TO_TICKS(500))
                 {
                     LOGV(nameof(OTA::API), "Received %d/%d bytes...", totalReceived, req->content_len);
-                    lastLog = xTaskGetTickCount();
+                    lastLog = now;
                 }
 
                 err = esp_ota_write(_otaHandle, buf, received);
@@ -75,6 +78,10 @@ namespace ReadieFur::Network::OTA
                     _otaHandle = 0;
                     return ESP_FAIL;
                 }
+
+                //Yield with delay to allow higher priority tasks to run (useful for systems with realtime requirements).
+                //If this value is 0 it will still yield for the highest of priority tasks, so it is better to have this than check for 0 and skip in my opinion even though it adds a few extra cpu cycles.
+                vTaskDelay(pdMS_TO_TICKS(_otaRecvIntervalMs));
             }
 
             if (received < 0)
@@ -117,7 +124,7 @@ namespace ReadieFur::Network::OTA
         }
 
     public:
-        static esp_err_t Init(httpd_config_t* config = nullptr)
+        static esp_err_t Init(httpd_config_t* config = nullptr, size_t otaRecvBufferSize = 1024, uint otaRecvIntervalMs = 10)
         {
             if (config == nullptr)
                 return ESP_ERR_INVALID_ARG;
@@ -134,6 +141,9 @@ namespace ReadieFur::Network::OTA
                 LOGE(nameof(OTA::API), "WiFi not initialized.");
                 return ESP_ERR_INVALID_STATE;
             }
+
+            _otaRecvBufferSize = otaRecvBufferSize;
+            _otaRecvIntervalMs = otaRecvIntervalMs;
 
             esp_err_t err = ESP_OK;
             if ((err = httpd_start(&_server, config)) != ESP_OK)
@@ -176,3 +186,5 @@ SemaphoreHandle_t ReadieFur::Network::OTA::API::_instanceMutex = xSemaphoreCreat
 httpd_handle_t ReadieFur::Network::OTA::API::_server = NULL;
 esp_ota_handle_t ReadieFur::Network::OTA::API::_otaHandle = 0;
 const esp_partition_t* ReadieFur::Network::OTA::API::_otaPartition = nullptr;
+size_t ReadieFur::Network::OTA::API::_otaRecvBufferSize = 1024;
+uint ReadieFur::Network::OTA::API::_otaRecvIntervalMs = 0;
