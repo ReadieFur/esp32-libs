@@ -100,8 +100,9 @@ namespace ReadieFur::Diagnostic
                         cpuLogString += recording.second;
                         cpuLogString += ", ";
                     }
-                    if (cpuLogString.ends_with(", "))
-                        cpuLogString = cpuLogString.substr(0, cpuLogString.length() - 2);
+                    //Remove trailing comma and space if they exist.
+                    // if (cpuLogString.ends_with(", "))
+                    //     cpuLogString = cpuLogString.substr(0, cpuLogString.length() - 2);
                     cpuRecordings.clear();
                     LOGD(nameof(DiagnosticsService), "%s", cpuLogString.c_str());
                     cpuLogString.clear();
