@@ -36,13 +36,15 @@ namespace ReadieFur::Network::WiFi
         {
             EspNowOp_Invalid,
             EspNowOp_Message = 1, //Must always remain as 1 for cross version compatibility (though all devices should use the same major version).
-            EspNowOp_QueryPeers,
-            EspNowOp_QueryPeersResponse,
+            EspNowOp_Autodiscover,
+            EspNowOp_AutodiscoverResponse,
             EspNowOp_Max
         };
 
         static void OnReceive(const esp_now_recv_info_t* info, const uint8_t* data, int len)
         {
+            //Mutex locks will not happen at the root of this function, avoids deadlocks that could otherwise occur.
+
             //Check if the data is for a QueryPeers request/response.
             EOperation operation;
             const uint8_t* payload;
@@ -63,11 +65,28 @@ namespace ReadieFur::Network::WiFi
                         callback(info, payload, payloadLen);
                     break;
                 }
-                case EOperation::EspNowOp_QueryPeers:
+                case EOperation::EspNowOp_Autodiscover:
                 {
+                    if (_doEncryption)
+                    {
+                        LOGV(nameof(WiFi::EspNow), "Dropping auto-discover request due to encryption being enabled.");
+                        return;
+                    }
+
+                    //Add the sender as a client (so we can send the response), assuming no encryption. My assumption is that if an encryption key is set on the device we are sending to transmission will fail?
+                    if (!esp_now_is_peer_exist(info->src_addr))
+                    {
+                        esp_err_t err = AddOrUpdatePeer(info->src_addr);
+                        if (err != ESP_OK)
+                        {
+                            LOGE(nameof(WiFi::EspNow), "Failed to add peer: %s", esp_err_to_name(err));
+                            return;
+                        }
+                    }
+
                     //Respond with own info.
-                    uint8_t* selfMac = new uint8_t[ESP_NOW_ETH_ALEN];
-                    esp_wifi_get_mac(__ESP_NOW_IF, selfMac);
+                    // uint8_t* selfMac = new uint8_t[ESP_NOW_ETH_ALEN];
+                    // esp_wifi_get_mac(__ESP_NOW_IF, selfMac);
 
                     //Get channel.
                     uint8_t channel;
@@ -83,15 +102,33 @@ namespace ReadieFur::Network::WiFi
                     *(responsePayload) = channel;
                     *(responsePayload + sizeof(uint8_t)) = doEncryption;
 
-                    Send(EOperation::EspNowOp_QueryPeersResponse, selfMac, responsePayload, sizeof(responsePayload));
+                    Send(EOperation::EspNowOp_AutodiscoverResponse, info->src_addr, responsePayload, sizeof(responsePayload));
                     break;
                 }
-                case EOperation::EspNowOp_QueryPeersResponse:
+                case EOperation::EspNowOp_AutodiscoverResponse:
                 {
+                    if (_doEncryption)
+                    {
+                        //Shouldn't happen if the above is blocked.
+                        LOGV(nameof(WiFi::EspNow), "Dropping auto-discover response due to encryption being enabled.");
+                        return;
+                    }
+
                     //Build peer info.
                     uint8_t* peerMac = info->src_addr;
                     uint8_t channel = *(payload);
                     bool doEncryption = *(payload + sizeof(uint8_t));
+
+                    //Check if the peer is already in the list.
+                    if (esp_now_is_peer_exist(peerMac))
+                    {
+                        //Peer already exists in known connections, skip.
+                        return;
+                    }
+
+                    //Add the peer to the list.
+                    AddOrUpdatePeer(peerMac);
+
                     OnPeerDiscovered.Dispatch(peerMac, channel, doEncryption);
                     break;
                 }
@@ -144,6 +181,7 @@ namespace ReadieFur::Network::WiFi
         }
 
     public:
+        //If local encryption is enabled then autodiscovery will be disabled.
         static esp_err_t Init(const uint8_t* localEncryptionKey = nullptr)
         {
             std::lock_guard<std::mutex> lock(_mutex);
@@ -381,11 +419,18 @@ namespace ReadieFur::Network::WiFi
             return ESP_OK;
         }
 
-        static esp_err_t ScanForPeers()
+        static esp_err_t AutodiscoverScan()
         {
             __ESP_NOW_LOCK();
 
-            esp_err_t err = Send(EOperation::EspNowOp_QueryPeers, BROADCAST_ADDRESS, nullptr, 0);
+            uint8_t channel;
+            wifi_second_chan_t second;
+            esp_wifi_get_channel(&channel, &second);
+
+            uint8_t selfInfo[sizeof(uint8_t)];
+            *(selfInfo) = channel;
+
+            esp_err_t err = Send(EOperation::EspNowOp_Autodiscover, BROADCAST_ADDRESS, selfInfo, sizeof(selfInfo));
             if (err != ESP_OK)
             {
                 LOGE(nameof(WiFi::EspNow), "Failed to query peers: %s", esp_err_to_name(err));
