@@ -144,7 +144,7 @@ namespace ReadieFur::Network::WiFi
         }
 
     public:
-        static esp_err_t Init(const uint8_t* encryptionKey = nullptr)
+        static esp_err_t Init(const uint8_t* localEncryptionKey = nullptr)
         {
             std::lock_guard<std::mutex> lock(_mutex);
             if (_initalized)
@@ -172,9 +172,9 @@ namespace ReadieFur::Network::WiFi
                 return err;
             }
 
-            if (encryptionKey != nullptr)
+            if (localEncryptionKey != nullptr)
             {
-                err = esp_now_set_pmk(encryptionKey);
+                err = esp_now_set_pmk(localEncryptionKey);
                 if (err != ESP_OK)
                 {
                     LOGE(nameof(WiFi::EspNow), "Failed to set encryption key: %s", esp_err_to_name(err));
@@ -240,16 +240,16 @@ namespace ReadieFur::Network::WiFi
             return _initalized;
         }
 
-        static esp_err_t AddOrUpdatePeer(const uint8_t* peerMac, const uint8_t* peerKey = 0)
+        static esp_err_t AddOrUpdatePeer(const uint8_t* peerMac, const uint8_t* peerEncryptionKey = nullptr)
         {
             __ESP_NOW_LOCK();
 
             esp_now_peer_info_t peerInfo;
             memcpy(peerInfo.peer_addr, peerMac, ESP_NOW_ETH_ALEN);
-            if (peerKey != 0)
+            if (peerEncryptionKey != nullptr)
             {
                 peerInfo.encrypt = true;
-                memcpy(peerInfo.lmk, peerKey, ESP_NOW_KEY_LEN);
+                memcpy(peerInfo.lmk, peerEncryptionKey, ESP_NOW_KEY_LEN);
             }
             else
             {
