@@ -26,7 +26,7 @@ namespace ReadieFur::Service
     friend class ServiceManager;
     private:
         std::mutex _serviceMutex;
-        std::function<AService*(std::type_index)> _getServiceCallback = nullptr;
+        std::function<AService*(std::type_index)> _getServiceCallback = nullptr; //Exists as a convience factor for implementing classes, rather than importing and calling from the service manager directly.
         std::unordered_set<std::type_index> _dependencies = {};
         Event::AutoResetEvent _taskEndedEvent;
         TaskHandle_t _taskHandle = NULL;
