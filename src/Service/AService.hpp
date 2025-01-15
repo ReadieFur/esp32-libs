@@ -53,37 +53,6 @@ namespace ReadieFur::Service
             }
         }
 
-        // bool ContainsCircularDependency(AService* service)
-        // {
-        //     //This was originally a recursive method however I am using an iterative method to save space on the stack.
-        //     std::unordered_set<AService*> visited;
-        //     std::stack<AService*> toCheck;
-        //     toCheck.push(service);
-
-        //     while (!toCheck.empty())
-        //     {
-        //         AService* current = toCheck.top();
-        //         toCheck.pop();
-
-        //         //If we already visited this service then a circular dependency has been found.
-        //         if (visited.count(current))
-        //             return true;
-
-        //         visited.insert(current);
-
-        //         //Check dependencies of the current service.
-        //         for (auto&& dependency : current->_installedDependencies)
-        //         {
-        //             if (dependency.second == this)
-        //                 return true; //Circular dependency found.
-
-        //             toCheck.push(dependency.second);
-        //         }
-        //     }
-
-        //     return false;
-        // }
-
         EServiceResult StartService()
         {
             _serviceMutex.lock();
@@ -228,7 +197,7 @@ namespace ReadieFur::Service
         bool IsRunning()
         {
             // _serviceMutex.lock();
-            bool retVal = _taskHandle != NULL;
+            bool retVal = _taskHandle != NULL && eTaskGetState(_taskHandle) != eTaskState::eSuspended;
             // _serviceMutex.unlock();
             return retVal;
         }

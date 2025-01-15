@@ -11,6 +11,8 @@ namespace ReadieFur::Service
         MissingDependencies,
         DependencyNotReady,
         AlreadyInstalled,
-        Timeout
+        Timeout,
+        Suspended,
+        NotReady
     };
 };

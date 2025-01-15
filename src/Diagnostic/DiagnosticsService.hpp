@@ -77,6 +77,7 @@ namespace ReadieFur::Diagnostic
 
             //Free allocated memory for taskStatusArray.
             free(tasksArray);
+            return true;
             #else
             // auto a = ReadieFur::Service::ServiceManager::_services;
             return false;
