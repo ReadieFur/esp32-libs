@@ -24,12 +24,14 @@ namespace ReadieFur::Event
 
             for (auto &&waitHandle : waitHandles)
             {
-                if (waitHandle == nullptr)
-                    continue;
+                // if (waitHandle == nullptr)
+                //     continue;
 
                 TickType_t remaining = timeout - (xTaskGetTickCount() - start);
                 if (!waitHandle->WaitOne(remaining))
                     return false;
+
+                portYIELD();
             }
 
             return true;
@@ -48,9 +50,6 @@ namespace ReadieFur::Event
             {
                 for (auto &&waitHandle : waitHandles)
                 {
-                    if (waitHandle == nullptr)
-                        continue;
-
                     TickType_t remaining = timeout - (xTaskGetTickCount() - start);
                     if (remaining <= 0)
                         return false;
@@ -58,7 +57,7 @@ namespace ReadieFur::Event
                     if (waitHandle->WaitOne(0))
                         return true;
 
-                    portYIELD(); //Allow other tasks to run.
+                    portYIELD(); //Allow other tasks to run between this busy loop.
                 }
             }
         }

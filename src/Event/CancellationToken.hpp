@@ -72,7 +72,10 @@ namespace ReadieFur::Event
             delete params;
         }
 
-        bool WaitOne(TickType_t) override { return true; }
+        bool WaitOne(TickType_t timeoutTicks) override
+        {
+            return xEventGroupWaitBits(_eventGroup, (1 << 0), pdFALSE, pdTRUE, timeoutTicks) == (1 << 0);
+        }
 
     public:
         virtual ~CancellationTokenSource()
