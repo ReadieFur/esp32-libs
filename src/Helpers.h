@@ -19,3 +19,12 @@
 #define ESP32_LIBS_VERSION_MAJOR UINT8_C(1)
 #define ESP32_LIBS_VERSION_MINOR UINT8_C(0)
 #define ESP32_LIBS_VERSION_PATCH UINT8_C(0)
+
+#ifdef DEBUG
+#define HALT() do {                 \
+    vTaskSuspendAll();              \
+    while (1) {                     \
+        ets_delay_us(UINT32_MAX);   \
+    }                               \
+} while (0)
+#endif

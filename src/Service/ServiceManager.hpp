@@ -11,6 +11,9 @@
 #include <stack>
 #include <map>
 #include <vector>
+#include <unordered_set>
+#include <queue>
+#include "Logging.hpp"
 
 namespace ReadieFur::Service
 {
@@ -19,6 +22,7 @@ namespace ReadieFur::Service
     // friend class ReadieFur::Diagnostic::DiagnosticsService;
     private:
         static std::mutex _mutex;
+        // static std::vector<std::type_index> _orderedServices; //Increases memory usage slightly but means I don't need to figure out an algorithm for sorting the services by dependencies as this is restricted by the service installation.
         static std::map<std::type_index, AService*> _services;
         static std::map<std::type_index, std::vector<AService*>> _references;
 
@@ -72,6 +76,7 @@ namespace ReadieFur::Service
                 dependency->push_back(service);
 
             _services[std::type_index(typeid(T))] = service;
+            // _orderedServices.push_back(std::type_index(typeid(T)));
 
             _mutex.unlock();
             return EServiceResult::Ok;
@@ -107,6 +112,7 @@ namespace ReadieFur::Service
 
             delete service->second;
             _services.erase(std::type_index(typeid(T)));
+            // _orderedServices.erase(std::remove(_orderedServices.begin(), _orderedServices.end(), std::type_index(typeid(T))), _orderedServices.end());
 
             _mutex.unlock();
             return EServiceResult::Ok;
@@ -296,50 +302,62 @@ namespace ReadieFur::Service
             return retVal;
         }
 
-        /// @brief Get a service list by dependencies, where the first service in the list is the one that must be started first and the last is the one with no dependencies.
+        /// @brief Get a service list by dependencies, where the first service in the list is the one that must be started first/ended last and the last is the one that must be started last/ended first.
+        //https://www.geeksforgeeks.org/topological-sorting-indegree-based-solution/
+        //This algorithm wouldn't strictly be needed if I stored the services in a sorted order due to services having to be installed in the order of their dependencies, but it is good to have this anyway.
         static std::vector<std::type_index> GetServices()
         {
             _mutex.lock();
 
-            std::vector<std::type_index> services;
-            for (auto &&service : _services)
-                services.push_back(service.first);
+            std::map<std::type_index, std::vector<std::type_index>> dependencyGraph;
+            std::unordered_map<std::type_index, int> inDegree;
+            std::vector<std::type_index> sortedOrder;
 
-            //This was originally a recursive method however I am using an iterative method to save space on the stack.
-            std::unordered_set<std::type_index> visited;
-            std::stack<std::type_index> toCheck;
-            for (auto &&service : services)
-                toCheck.push(service);
-
-            std::vector<std::type_index> sortedServices;
-            while (!toCheck.empty())
+            //Build the dependency graph and initialize in-degrees.
+            for (const auto& [serviceType, service] : _services)
             {
-                std::type_index current = toCheck.top();
-                toCheck.pop();
+                if (!inDegree.count(serviceType))
+                    inDegree[serviceType] = 0;
 
-                //If we already visited this service then a circular dependency has been found.
-                if (visited.count(current))
+                for (const auto& dependency : service->_dependencies)
                 {
-                    _mutex.unlock();
-                    return {};
+                    dependencyGraph[dependency].push_back(serviceType);
+                    inDegree[serviceType]++;
+                    if (!inDegree.count(dependency))
+                        inDegree[dependency] = 0;
                 }
+            }
 
-                visited.insert(current);
+            //Use a priority queue for zero-in-degree services (i.e. services that have no dependencies go first).
+            std::priority_queue<std::type_index, std::vector<std::type_index>, std::greater<>> zeroInDegreeQueue;
+            for (const auto& [type, degree] : inDegree)
+                if (degree == 0)
+                    zeroInDegreeQueue.push(type);
 
-                //Check dependencies of the current service.
-                auto service = _services.find(current);
-                for (auto &&dependency : service->second->_dependencies)
+            //Perform topological sort.
+            while (!zeroInDegreeQueue.empty())
+            {
+                std::type_index current = zeroInDegreeQueue.top();
+                zeroInDegreeQueue.pop();
+                sortedOrder.push_back(current);
+
+                for (const auto& dependent : dependencyGraph[current])
                 {
-                    if (std::find(sortedServices.begin(), sortedServices.end(), dependency) == sortedServices.end())
-                        toCheck.push(dependency);
+                    inDegree[dependent]--;
+                    if (inDegree[dependent] == 0)
+                        zeroInDegreeQueue.push(dependent);
                 }
+            }
 
-                sortedServices.push_back(current);
+            //Check for circular dependencies.
+            if (sortedOrder.size() != inDegree.size())
+            {
+                LOGE(nameof(ServiceManager), "Circular dependency detected.");
+                abort();
             }
 
             _mutex.unlock();
-
-            return sortedServices;
+            return sortedOrder;
         }
     };
 };
