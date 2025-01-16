@@ -47,6 +47,11 @@ namespace ReadieFur::Event
 
                 return (bitsSnapshot & (1 << 0)) == (1 << 0);
             }
+
+            AWaitHandle* GetHandle()
+            {
+                return _cts;
+            }
         };
         
     private:
