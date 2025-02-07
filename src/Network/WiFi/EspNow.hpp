@@ -41,7 +41,7 @@ namespace ReadieFur::Network::WiFi
             EspNowOp_Max
         };
 
-        #ifdef ARDUINO
+        #if defined(ARDUINO) && ARDUINO < 10600
         static void OnReceive(const uint8_t* macAddress, const uint8_t* data, int len)
         #else
         static void OnReceive(const esp_now_recv_info_t* info, const uint8_t* data, int len)
@@ -61,7 +61,7 @@ namespace ReadieFur::Network::WiFi
             }
 
             const uint8_t* srcMacAddress;
-            #ifdef ARDUINO
+            #if defined(ARDUINO) && ARDUINO < 10600
             srcMacAddress = macAddress;
             #else
             srcMacAddress = info->src_addr;
