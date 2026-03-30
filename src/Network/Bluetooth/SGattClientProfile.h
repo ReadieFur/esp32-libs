@@ -1,5 +1,6 @@
 #pragma once
 
+#if defined(CONFIG_BT_BLUEDROID_ENABLED)
 #include <stdint.h>
 #include <esp_gattc_api.h>
 #include <functional>
@@ -14,3 +15,4 @@ namespace ReadieFur::Network::Bluetooth
         uint16_t connectionId = 0;
     };
 };
+#endif

@@ -1,5 +1,6 @@
 #pragma once
 
+#if defined(CONFIG_BT_BLUEDROID_ENABLED)
 #include <nvs_flash.h>
 #include <esp_bt.h>
 #include <esp_gap_ble_api.h>
@@ -619,3 +620,4 @@ std::mutex ReadieFur::Network::Bluetooth::BLE::_mutex;
 uint8_t ReadieFur::Network::Bluetooth::BLE::_advConfigDone = 0;
 std::vector<ReadieFur::Network::Bluetooth::SGattServerProfile*> ReadieFur::Network::Bluetooth::BLE::_serverProfiles;
 std::vector<ReadieFur::Network::Bluetooth::SGattClientProfile*> ReadieFur::Network::Bluetooth::BLE::_clientProfiles;
+#endif

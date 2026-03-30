@@ -1,5 +1,6 @@
 #pragma once
 
+#if defined(CONFIG_BT_BLUEDROID_ENABLED)
 #include <esp_gatt_defs.h>
 #include <mutex>
 #include <esp_err.h>
@@ -455,3 +456,4 @@ namespace ReadieFur::Network::Bluetooth
         }
     };
 };
+#endif

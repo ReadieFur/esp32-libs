@@ -1,5 +1,6 @@
 #pragma once
 
+#if defined(CONFIG_BT_BLUEDROID_ENABLED)
 #include <esp_bt_defs.h>
 #include <string.h>
 #include <string>
@@ -211,3 +212,4 @@ namespace ReadieFur::Network::Bluetooth
         }
     };
 };
+#endif
