@@ -89,7 +89,7 @@ namespace ReadieFur::Event
         bool CancelAfter(TickType_t timeoutTicks)
         {
             char buf[configMAX_TASK_NAME_LEN];
-            sprintf(buf, "cts%012d", xTaskGetTickCount());
+            sprintf(buf, "cts%012lu", xTaskGetTickCount());
 
             STimeoutCallbackParams* params = new STimeoutCallbackParams
             {
