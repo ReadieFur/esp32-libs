@@ -359,6 +359,24 @@ namespace ReadieFur::Service
             _mutex.unlock();
             return sortedOrder;
         }
+
+        static const char* ServiceResultToString(EServiceResult result)
+        {
+            switch (result)
+            {
+                case EServiceResult::Ok: return "Ok";
+                case EServiceResult::Failed: return "Failed";
+                case EServiceResult::NotInstalled: return "NotInstalled";
+                case EServiceResult::InUse: return "InUse";
+                case EServiceResult::MissingDependencies: return "MissingDependencies";
+                case EServiceResult::DependencyNotReady: return "DependencyNotReady";
+                case EServiceResult::AlreadyInstalled: return "AlreadyInstalled";
+                case EServiceResult::Timeout: return "Timeout";
+                case EServiceResult::Suspended: return "Suspended";
+                case EServiceResult::NotReady: return "NotReady";
+                default: return "UnknownResult";
+            }
+        }
     };
 };
 

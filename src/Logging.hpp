@@ -94,13 +94,13 @@ namespace ReadieFur
         {
             int retval = fputs(data, ORIGINAL_STDOUT); //Avoids the newline character that puts adds.
             for (auto logger : AdditionalLoggers)
-                logger(data, size);
+                logger(data, size, level);
             return retval;
         }
         #endif
 
     public:
-        static std::vector<std::function<int(const char*, size_t)>> AdditionalLoggers;
+        static std::vector<std::function<int(const char*, size_t, esp_log_level_t)>> AdditionalLoggers;
 
         #ifdef _ENABLE_STDOUT_HOOK
         //DO NOT USE THIS FOR NOW, IT IS NOT COMPLETE.
@@ -140,12 +140,12 @@ namespace ReadieFur
             //TODO: Set a custom log level/tag for each additional logger.
             //TODO: Change the stdout stream to a wrapped one that I can intercept and send to the additional loggers.
             #ifndef _ENABLE_STDOUT_HOOK
-            FormatWrite([](const char* data, size_t len)
+            FormatWrite([level](const char* data, size_t len)
             {
                 // puts(data);
                 fputs(data, stdout); //Avoids the newline character that puts adds.
                 for (auto logger : AdditionalLoggers)
-                    logger(data, len);
+                    logger(data, len, level);
                 return 0;
             }, format, args);
             #endif
@@ -184,4 +184,4 @@ FILE* ReadieFur::Logging::ORIGINAL_STDOUT = stdout; //Set at program startup, sh
 SemaphoreHandle_t ReadieFur::Logging::_mutex = xSemaphoreCreateMutex();
 char* ReadieFur::Logging::_buffer = nullptr;
 #endif
-std::vector<std::function<int(const char*, size_t)>> ReadieFur::Logging::AdditionalLoggers;
+std::vector<std::function<int(const char*, size_t, esp_log_level_t)>> ReadieFur::Logging::AdditionalLoggers;
