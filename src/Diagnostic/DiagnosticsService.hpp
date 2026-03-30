@@ -11,6 +11,7 @@
 #include <freertos/FreeRTOSConfig.h>
 #include <string>
 #include <Service/ServiceManager.hpp>
+#include <driver/temperature_sensor.h>
 
 namespace ReadieFur::Diagnostic
 {
@@ -53,6 +54,11 @@ namespace ReadieFur::Diagnostic
             #endif
         }
 
+        static bool GetCpuTemperature(temperature_sensor_handle_t tempSensor, float& outTemperature)
+        {
+            return temperature_sensor_get_celsius(tempSensor, &outTemperature) == ESP_OK;
+        }
+
         static void GetFreeMemory(size_t& outIram, size_t& outDram)
         {
             outIram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
@@ -87,6 +93,15 @@ namespace ReadieFur::Diagnostic
     protected:
         void RunServiceImpl() override
         {
+            esp_err_t err;
+            temperature_sensor_handle_t tempSensor = NULL;
+            temperature_sensor_config_t tempSensorConfig = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
+            if ((err = temperature_sensor_install(&tempSensorConfig, &tempSensor)) != ESP_OK || (err = temperature_sensor_enable(tempSensor)) != ESP_OK)
+            {
+                LOGE(nameof(DiagnosticsService), "Failed to install temperature sensor driver: %s", esp_err_to_name(err));
+                return;
+            }
+
             while (!ServiceCancellationToken.IsCancellationRequested())
             {
                 std::map<BaseType_t, int32_t> cpuRecordings;
@@ -108,6 +123,10 @@ namespace ReadieFur::Diagnostic
                     LOGD(nameof(DiagnosticsService), "%s", cpuLogString.c_str());
                     cpuLogString.clear();
                 }
+
+                float cpuTemp;
+                if (GetCpuTemperature(tempSensor, cpuTemp))
+                    LOGD(nameof(DiagnosticsService), "CPU Temperature: %.02f°C", cpuTemp);
 
                 size_t iram, dram;
                 GetFreeMemory(iram, dram);
