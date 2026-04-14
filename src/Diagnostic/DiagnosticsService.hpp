@@ -59,10 +59,10 @@ namespace ReadieFur::Diagnostic
             return temperature_sensor_get_celsius(tempSensor, &outTemperature) == ESP_OK;
         }
 
-        static void GetFreeMemory(size_t& outIram, size_t& outDram)
+        static void GetMemoryStats(size_t& freeHeap, size_t& largestFreeBlock)
         {
-            outIram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-            outDram = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+            freeHeap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+            largestFreeBlock = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
         }
 
         static bool GetTasksFreeStack(std::map<const char*, size_t>& outRecordings)
@@ -128,9 +128,9 @@ namespace ReadieFur::Diagnostic
                 if (GetCpuTemperature(tempSensor, cpuTemp))
                     LOGD(nameof(DiagnosticsService), "CPU Temperature: %.02f°C", cpuTemp);
 
-                size_t iram, dram;
-                GetFreeMemory(iram, dram);
-                LOGD(nameof(DiagnosticsService), "Memory free: IRAM: %u, DRAM: %u", iram, dram);
+                size_t freeHeap, largestFreeBlock;
+                GetMemoryStats(freeHeap, largestFreeBlock);
+                LOGD(nameof(DiagnosticsService), "Memory free: %u, Largest free block: %u", freeHeap, largestFreeBlock);
 
                 std::map<const char*, size_t> taskRecordings;
                 if (GetTasksFreeStack(taskRecordings))
